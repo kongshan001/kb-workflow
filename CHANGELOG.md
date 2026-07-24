@@ -33,6 +33,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - 10-topic starter whitelist
 - Sample tested end-to-end on demo1 project
 
-[Unreleased]: https://github.com/yourname/kb-workflow/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/yourname/kb-workflow/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/yourname/kb-workflow/releases/tag/v0.1.0
+[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/kongshan001/kb-workflow/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/kongshan001/kb-workflow/releases/tag/v0.1.0

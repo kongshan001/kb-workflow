@@ -16,7 +16,7 @@
 ## 安装
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourname/kb-workflow/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kongshan001/kb-workflow/main/install.sh | bash
 ```
 
 或本地开发模式：

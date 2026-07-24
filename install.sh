@@ -18,7 +18,7 @@
 set -euo pipefail
 
 # ---------- config ----------
-GITHUB_REPO="${KB_WORKFLOW_REPO:-https://github.com/yourname/kb-workflow.git}"
+GITHUB_REPO="${KB_WORKFLOW_REPO:-https://github.com/kongshan001/kb-workflow.git}"
 WORKFLOW_HOME="${KB_WORKFLOW_HOME:-$HOME/kb-workflow}"
 KB_ROOT="${KB_ROOT:-$HOME/.claude/kb}"
 SKILL_DIR="$HOME/.claude/skills/kb-workflow"
