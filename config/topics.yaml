@@ -1,0 +1,34 @@
+# Topic whitelist
+# 主题对应：external/ 子目录分类 + MemPalace room
+
+topics:
+  - id: rag
+    label: RAG / 向量检索
+    palace_room: kb_external/rag
+  - id: shader
+    label: GLSL / Shader / 渲染
+    palace_room: kb_external/shader
+  - id: ocr
+    label: OCR / 文档解析
+    palace_room: kb_external/ocr
+  - id: web
+    label: Web 前端
+    palace_room: kb_external/web
+  - id: infra
+    label: 基础设施 / 部署
+    palace_room: kb_external/infra
+  - id: ml
+    label: 机器学习
+    palace_room: kb_external/ml
+  - id: lang-zh
+    label: 中文相关
+    palace_room: kb_external/lang-zh
+  - id: lang-en
+    label: 英文相关
+    palace_room: kb_external/lang-en
+  - id: mobile
+    label: 移动端
+    palace_room: kb_external/mobile
+  - id: desktop
+    label: 桌面端
+    palace_room: kb_external/desktop

@@ -1,0 +1,139 @@
+# kb-workflow defaults
+# Per-host overrides go in ~/.claude/kb/config.local.yaml (NOT this file).
+
+version: 1
+
+# ---------- paths ----------
+paths:
+  kb_root: "~/.claude/kb"
+  entries_dir: "entries"
+  external_dir: "external"
+  state_file: "_state.md"
+  local_config: "config.local.yaml"
+
+# ---------- entry types ----------
+entry_types:
+  fact:
+    name: fact
+    description: 关于外部世界的观察
+    fields:
+      - name
+      - description
+      - type
+      - source
+      - confidence       # high | medium | low
+      - observed_at      # YYYY-MM-DD
+      - expires_at       # null or YYYY-MM-DD
+      - scope
+      - content
+  preference:
+    name: preference
+    description: 用户希望我怎么做
+    fields:
+      - name
+      - description
+      - type
+      - scope            # always | when-X | for-Y
+      - anti_examples    # optional, list
+      - source
+      - last_validated   # YYYY-MM-DD
+      - content
+  decision:
+    name: decision
+    description: 已敲定的选择
+    fields:
+      - name
+      - description
+      - type
+      - decided_at
+      - supersedes       # null or slug
+      - alternatives_considered
+      - context
+      - content
+  tentative:
+    name: tentative
+    description: 候选项
+    fields:
+      - name
+      - description
+      - type
+      - status           # open | confirmed | abandoned
+      - opened_at
+      - last_surfaced    # null or YYYY-MM-DD
+      - scope
+      - source
+      - content
+
+# ---------- heuristics (type detection) ----------
+heuristics:
+  preference_signals:
+    - "\\b(别|不要|禁止|avoid|don't|never|always|以后都|remember)\\b"
+    - "^(please\\s+)?(do|don't|make sure|avoid|prefer|use|use\\s+always)"
+    - "\\b(我希望|我想|让我|我要求)\\b"
+  fact_signals:
+    - "^(https?://|www\\.)"
+    - "\\b(released|published|introduced|文档|博客|文章|新闻)\\b"
+    - "\\b(根据|according to|reported|研究表明)\\b"
+  decision_signals:
+    - "\\b(决定|选定|敲定|选了|定为|we('ll|\\s+will|\\s+decided|\\s+chose))\\b"
+    - "^(决定|选定|敲定)"
+  tentative_signals:
+    - "\\b(想试试|考虑|也许|或许|以后再说|先放着|可以试试)\\b"
+    - "^(我以后|也许我|considering|might|maybe)"
+
+# ---------- dedup / conflict ----------
+dedup:
+  similarity_threshold: 0.9      # above this = duplicate
+  conflict_negation_weight: 0.3  # boost for "不是 / don't / never" patterns
+
+# ---------- escalation triggers (D6) ----------
+escalation:
+  - name: decision_conflict
+    description: 与已敲定决策冲突
+  - name: future_commitment
+    description: 检测到对未来动作的承诺
+  - name: sensitive_data
+    description: 包含密钥 / PII
+  - name: ambiguous
+    description: 信息模糊无法归档
+  - name: explicit_user
+    description: 用户显式触发（"我们定一下"）
+
+# ---------- review (D7) ----------
+review:
+  cadence: "0 18 * * 0"           # weekly Sunday 6pm (cron syntax)
+  on_demand_phrases:
+    - "回顾一下"
+    - "kb-review"
+    - "看看都记了啥"
+    - "review"
+  thresholds:
+    conflicts: 3
+    tentative_open: 5
+  max_per_session: 10              # cap per review
+
+# ---------- recall (D8) ----------
+recall:
+  inject_state_file_on_session_start: true
+  palace_topic_triggers: true       # auto search palace on topic match
+  tentative_in_normal_context: false  # never inject in normal context
+
+# ---------- ticket format ----------
+ticket:
+  capture: "📌 记为 <type>: <slug>  source=<src>  confidence=<c>"
+  conflict: "⚠️  CONFLICT with <other_slug>: <reason>"
+  refine:   "🔗 REFINES <parent_slug>: <delta>"
+  update:   "✏️  UPDATES <old_slug>: <change>"
+
+# ---------- semantic search (palace) ----------
+palace:
+  enabled_by_default: true
+  wing: kb_external
+  rooms: []    # populated from topics
+  fallback: grep
+
+# ---------- embedding (future) ----------
+embedding:
+  model: bge-small
+  dimension: 384
+  similarity_metric: cosine

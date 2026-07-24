@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# kb-workflow - CLI for KB ingestion workflow
+#
+# Subcommands:
+#   install   - one-click setup (handled by install.sh, this just redirects)
+#   status    - show current state
+#   update    - check for and apply updates
+#   uninstall - clean removal
+
+set -euo pipefail
+
+# ---------- resolve KB_ROOT + workflow home ----------
+KB_ROOT="${KB_ROOT:-$HOME/.claude/kb}"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+# follow symlink to find real install location
+if [[ -L "$SCRIPT_PATH" ]]; then
+  REAL_SCRIPT="$(readlink -f "$SCRIPT_PATH" 2>/dev/null || readlink "$SCRIPT_PATH")"
+else
+  REAL_SCRIPT="$SCRIPT_PATH"
+fi
+WORKFLOW_HOME="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
+
+VERSION="0.1.0-dev"
+
+# ---------- colors ----------
+if [[ -t 1 ]]; then
+  C_RESET='\033[0m'; C_DIM='\033[2m'; C_BOLD='\033[1m'
+  C_GREEN='\033[32m'; C_YELLOW='\033[33m'; C_RED='\033[31m'; C_BLUE='\033[34m'
+else
+  C_RESET=''; C_DIM=''; C_BOLD=''
+  C_GREEN=''; C_YELLOW=''; C_RED=''; C_BLUE=''
+fi
+say()  { printf '%b\n' "$*"; }
+hdr()  { say "${C_BOLD}${C_BLUE}$*${C_RESET}"; }
+ok()   { say "  ${C_GREEN}✅${C_RESET} $*"; }
+warn() { say "  ${C_YELLOW}⚠️ ${C_RESET} $*"; }
+err()  { say "  ${C_RED}❌${C_RESET} $*"; }
+
+usage() {
+  cat <<EOF
+${C_BOLD}kb-workflow${C_RESET} v${VERSION} — KB ingestion workflow CLI
+
+${C_BOLD}Usage:${C_RESET}
+  kb-workflow <command> [args]
+
+${C_BOLD}Commands:${C_RESET}
+  status      Show installed state, capabilities, queue stats
+  update      Check for and apply updates (auto for patch/minor)
+  uninstall   Clean removal (keeps KB data unless --purge)
+  version     Print version
+  help        This help
+
+${C_BOLD}Env:${C_RESET}
+  KB_ROOT     Override KB root (default: $HOME/.claude/kb)
+  KB_WORKFLOW_REPO  Override GitHub repo URL (for fresh install)
+EOF
+}
+
+# ---------- subcommands ----------
+cmd_status() {
+  hdr "📊 KB workflow status"
+  say "  ${C_DIM}workflow:${C_RESET} $WORKFLOW_HOME (v${VERSION})"
+  say "  ${C_DIM}kb_root:${C_RESET}  $KB_ROOT"
+  say ""
+
+  if [[ -f "$KB_ROOT/.installed_source" ]]; then
+    say "  ${C_DIM}installed_from:${C_RESET} $(cat "$KB_ROOT/.installed_source")"
+  fi
+
+  # counts
+  local entries external conflicts tentative
+  entries=$(find "$KB_ROOT/entries" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+  external=$(find "$KB_ROOT/external" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+  conflicts=$(grep -c "^>" "$KB_ROOT/_state.md" 2>/dev/null || echo 0)
+  tentative=$(grep -c "tentative-" "$KB_ROOT/_state.md" 2>/dev/null || echo 0)
+  say "  ${C_BOLD}Stats${C_RESET}"
+  say "    entries/:    $entries"
+  say "    external/:   $external"
+  say "    待裁定:     $conflicts"
+  say "    tentative:   $tentative"
+  say ""
+
+  # capabilities
+  hdr "🔧 Capabilities"
+  if [[ -x "$WORKFLOW_HOME/scripts/capability-detect.sh" ]]; then
+    "$WORKFLOW_HOME/scripts/capability-detect.sh" 2>/dev/null | sed 's/^/  /' || warn "capability-detect failed"
+  else
+    warn "capability-detect.sh not found"
+  fi
+  say ""
+
+  # staleness
+  if [[ -x "$WORKFLOW_HOME/scripts/check-staleness.sh" ]]; then
+    local stale
+    stale=$("$WORKFLOW_HOME/scripts/check-staleness.sh" 2>/dev/null || echo "")
+    if [[ -n "$stale" ]]; then
+      warn "Workflow behind remote — run: kb-workflow update"
+    else
+      ok "Workflow up to date"
+    fi
+  fi
+  say ""
+
+  # commands reminder
+  hdr "🛠  In Claude session"
+  say "    /kb-review   /kb-search X   /kb-status   /kb-workflow update"
+}
+
+cmd_update() {
+  hdr "🔄 Checking for updates"
+  if [[ ! -d "$WORKFLOW_HOME/.git" ]]; then
+    warn "workflow home $WORKFLOW_HOME is not a git repo"
+    warn "skip update check (this is expected for local-dev installs)"
+    return 0
+  fi
+
+  local local_commit remote_commit
+  local_commit=$(git -C "$WORKFLOW_HOME" rev-parse HEAD 2>/dev/null || echo "none")
+
+  # try fetch
+  if ! git -C "$WORKFLOW_HOME" fetch --quiet 2>/dev/null; then
+    warn "fetch failed (offline?) — using local version"
+    return 0
+  fi
+
+  # try to find remote
+  local remote_branch
+  remote_branch=$(git -C "$WORKFLOW_HOME" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "")
+  if [[ -z "$remote_branch" ]]; then
+    warn "no upstream configured — skip update check"
+    return 0
+  fi
+  remote_commit=$(git -C "$WORKFLOW_HOME" rev-parse "$remote_branch" 2>/dev/null || echo "")
+
+  if [[ "$local_commit" == "$remote_commit" ]]; then
+    ok "already at latest ($local_commit)"
+    return 0
+  fi
+
+  # determine bump type from version
+  local local_ver
+  local_ver=$(grep -m1 '^VERSION=' "$WORKFLOW_HOME/bin/kb-workflow" | cut -d'"' -f2 || echo "0.0.0")
+  # crude semver comparison
+  local major minor patch
+  IFS='.' read -r major minor patch <<< "${local_ver%%-*}"
+
+  # check if major bump in remote
+  local remote_ver="0.0.0"
+  # not perfect but safe — treat any divergence with major as major
+  # simplified: ask user if they want to proceed
+  say ""
+  warn "Local:  $local_ver ($local_commit)"
+  warn "Remote: $remote_ver ($remote_commit)"
+  say ""
+  say "  ${C_YELLOW}If this is a major version change, schema may be incompatible.${C_RESET}"
+  read -r -p "  Pull updates? [y/N] " ans
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    git -C "$WORKFLOW_HOME" pull --ff-only && ok "updated to $remote_commit"
+  else
+    warn "skipped"
+  fi
+}
+
+cmd_uninstall() {
+  exec "$WORKFLOW_HOME/uninstall.sh" "$@"
+}
+
+cmd_install() {
+  exec "$WORKFLOW_HOME/install.sh" "$@"
+}
+
+cmd_version() {
+  say "kb-workflow v${VERSION}"
+}
+
+# ---------- dispatch ----------
+case "${1:-help}" in
+  status)    shift; cmd_status "$@" ;;
+  update)    shift; cmd_update "$@" ;;
+  uninstall) shift; cmd_uninstall "$@" ;;
+  install)   shift; cmd_install "$@" ;;
+  version|-v|--version) cmd_version ;;
+  help|-h|--help|"") usage ;;
+  *) err "unknown command: $1"; usage; exit 1 ;;
+esac

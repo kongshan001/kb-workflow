@@ -1,0 +1,19 @@
+# Schema template: fact
+# 适用：关于外部世界的观察（"X 已发布"、"Y 库支持 Z"）
+
+name: <slug>
+description: <一句话结论>
+metadata:
+  type: fact
+  source: <URL | 文件路径 | "user-stated">
+  confidence: high | medium | low
+  observed_at: <YYYY-MM-DD>
+  expires_at: null
+  scope: <universal | <domain>>
+
+---
+
+<陈述本身，可选 1-2 句背景>
+
+**Why:** <为什么这个事实重要 / 来源>
+**How to apply:** <何时引用>

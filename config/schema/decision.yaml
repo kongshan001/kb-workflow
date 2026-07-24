@@ -1,0 +1,28 @@
+# Schema template: decision
+# 适用：已敲定的选择（"用 Postgres"、"前端走 React"）
+
+name: <slug>
+description: <决策结论>
+metadata:
+  type: decision
+  decided_at: <YYYY-MM-DD>
+  supersedes: null
+  alternatives_considered:
+    - <option-A>
+    - <option-B>
+  context: <触发这次决策的问题>
+
+---
+
+<决策 + 理由 + 替代方案对比 + 影响范围>
+
+**Why:**
+- <理由 1>
+- <理由 2>
+
+**How to apply:**
+- <触发场景>
+- <操作方式>
+
+**Supersedes history:**
+- <旧决策 slug>  (replaced on YYYY-MM-DD)

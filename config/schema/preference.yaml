@@ -1,0 +1,19 @@
+# Schema template: preference
+# 适用：用户希望我以后怎么做（"别建议备份"、"代码改完跑测试"）
+
+name: <slug>
+description: <规则一句话>
+metadata:
+  type: preference
+  scope: always | when-<X> | for-<Y>
+  anti_examples: null
+  source: <"user-stated" | <file>>
+  last_validated: <YYYY-MM-DD>
+
+---
+
+<规则正文>
+
+**Why:** <背景 / 来源>
+**How to apply:** <触发条件>
+**Anti-examples:** <反例 / 不适用场景>

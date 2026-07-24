@@ -1,0 +1,23 @@
+# Schema template: tentative
+# 适用：候选项（"我以后想试试 X"、"也许该用 Y"）
+# 状态机：open → confirmed (升级为 decision) | abandoned
+
+name: <slug>
+description: <候选项一句话>
+metadata:
+  type: tentative
+  status: open
+  opened_at: <YYYY-MM-DD>
+  last_surfaced: null
+  scope: <global | <domain>>
+  source: "user-stated"
+
+---
+
+<原话或转述>
+
+**Why:** <为什么考虑 / 听谁说的>
+**How to apply:** 暂不行动；下次回顾时确认
+  - 继续观望
+  - 升级为 decision
+  - 放弃 (status → abandoned)

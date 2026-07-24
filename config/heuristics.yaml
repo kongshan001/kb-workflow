@@ -1,0 +1,44 @@
+# Heuristic rules for auto-classification
+# 规则按优先级匹配；首条命中即定类型
+
+rules:
+  - priority: 100
+    name: explicit_decision
+    type: decision
+    pattern: "\\b(我们决定|我决定|敲定|定下来|选了|选了用|定为)\\b"
+
+  - priority: 90
+    name: explicit_preference
+    type: preference
+    pattern: "^(记住|别|不要|avoid|don't|never|always|以后都)\\b"
+
+  - priority: 85
+    name: explicit_tentative
+    type: tentative
+    pattern: "\\b(想试试|考虑|也许|或许|先放着|可以试试)\\b"
+
+  - priority: 80
+    name: explicit_fact
+    type: fact
+    pattern: "^(https?://|www\\.)"
+
+  - priority: 70
+    name: past_tense_fact
+    type: fact
+    pattern: "^(根据|据|published|released|introduced|上线了|发布了)"
+
+  - priority: 60
+    name: imperative_preference
+    type: preference
+    pattern: "^(请|please\\s+)?(do|don't|make sure|avoid|prefer|use|不要)"
+
+  - priority: 50
+    name: question_tentative
+    type: tentative
+    pattern: "^(是不是该|要不要|该不该)"
+
+  - priority: 0
+    name: default
+    type: fact
+    pattern: ".*"
+    note: 默认归类为 fact；模糊时升级为反问
