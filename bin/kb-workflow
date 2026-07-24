@@ -20,7 +20,7 @@ else
 fi
 WORKFLOW_HOME="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
 
-VERSION="0.1.0-dev"
+VERSION="0.1.1-dev"
 
 # ---------- colors ----------
 if [[ -t 1 ]]; then
@@ -67,17 +67,31 @@ cmd_status() {
     say "  ${C_DIM}installed_from:${C_RESET} $(cat "$KB_ROOT/.installed_source")"
   fi
 
-  # counts
+  # counts (precise: parse frontmatter type: field)
   local entries external conflicts tentative
-  entries=$(find "$KB_ROOT/entries" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-  external=$(find "$KB_ROOT/external" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-  conflicts=$(grep -c "^>" "$KB_ROOT/_state.md" 2>/dev/null || echo 0)
-  tentative=$(grep -c "tentative-" "$KB_ROOT/_state.md" 2>/dev/null || echo 0)
+  entries=$(find "$KB_ROOT/entries" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+  external=$(find "$KB_ROOT/external" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+
+  # count entries by type (parse frontmatter "type:" field)
+  local fact_n pref_n dec_n tent_n
+  fact_n=$(grep -l '^  type: fact' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ')
+  pref_n=$(grep -l '^  type: preference' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ')
+  dec_n=$(grep -l '^  type: decision' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ')
+  tent_n=$(grep -l '^  type: tentative' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ')
+
+  # conflicts: count "## ⚠️" + non-empty items (lines starting with "- " inside ⚠️ section)
+  if [[ -f "$KB_ROOT/_state.md" ]]; then
+    conflicts=$(awk '/^## ⚠️/{flag=1; next} /^## /{flag=0} flag && /^- /{c++} END{print c+0}' "$KB_ROOT/_state.md")
+    tentative=$(awk '/^## 🟡/{flag=1; next} /^## /{flag=0} flag && /^- /{c++} END{print c+0}' "$KB_ROOT/_state.md")
+  else
+    conflicts=0; tentative=0
+  fi
+
   say "  ${C_BOLD}Stats${C_RESET}"
-  say "    entries/:    $entries"
+  say "    entries/:    $entries  (fact=$fact_n preference=$pref_n decision=$dec_n tentative=$tent_n)"
   say "    external/:   $external"
   say "    待裁定:     $conflicts"
-  say "    tentative:   $tentative"
+  say "    tentative:   $tentative (open)"
   say ""
 
   # capabilities
