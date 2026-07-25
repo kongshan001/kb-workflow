@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-25
+
+### Added
+- USER_GUIDE.md — 14-section end-user handbook
+  - 5-minute quick start
+  - Daily usage (silent capture, tickets, slash commands)
+  - 4-class entry schema with real examples
+  - 5-red-light escalation rules
+  - Cross-device workflow
+  - Customization via config.local.yaml
+  - Troubleshooting FAQ
+  - Cheat sheet + recommended rhythm
+
 ## [0.1.1] - 2026-07-24
 
 ### Fixed
@@ -33,6 +46,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - 10-topic starter whitelist
 - Sample tested end-to-end on demo1 project
 
-[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/kongshan001/kb-workflow/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kongshan001/kb-workflow/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kongshan001/kb-workflow/releases/tag/v0.1.0
