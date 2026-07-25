@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- `regen_palace.py --plan` / `--apply` modes — generates structured JSON manifest
+  that the assistant can iterate to call `mempalace_add_drawer` for real mirroring
+  (was: dry-run only, "would mirror")
+- Fresh install verification: install.sh works in isolated HOME + KB_ROOT env
+- `specs/kb-workflow/plan.md` updated to v0.2.0 (D1 active-first, D2 external/,
+  D4 trigger scope, D6 no_capture_intent, D8 external/ read, W2 slash set)
+
+### Fixed
+- (no new fixes in this draft)
+
 ## [0.2.0] - 2026-07-25
 
 ### ⚠️ BREAKING CHANGES
@@ -87,7 +98,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - 10-topic starter whitelist
 - Sample tested end-to-end on demo1 project
 
-[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.2.1...HEAD
 [0.2.0]: https://github.com/kongshan001/kb-workflow/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kongshan001/kb-workflow/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kongshan001/kb-workflow/compare/v0.1.0...v0.1.1
