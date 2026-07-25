@@ -64,6 +64,30 @@ entry_types:
       - source
       - content
 
+# ---------- capture mode (v0.2.0) ----------
+# active-first: never auto-store. user must invoke /kb-capture or /kb-save-article
+# passive: auto-classify and store on every input (v0.1.x behavior, deprecated)
+capture:
+  default_mode: active
+  explicit_triggers:
+    slash_commands:
+      - /kb-capture
+      - /kb-save-article
+      - /kb-capture-force
+    natural_phrases:
+      - "记住"
+      - "记一下"
+      - "别"
+      - "不要"
+      - "以后"
+      - "以后都"
+      - "永远"
+      - "avoid"
+      - "always"
+      - "remember"
+  offer_suggestion: true          # when ambiguous, prompt "要 /kb-capture 吗？"
+  offer_threshold_confidence: 0.7  # only suggest if assistant is fairly sure it's worth saving
+
 # ---------- heuristics (type detection) ----------
 heuristics:
   preference_signals:
@@ -98,6 +122,8 @@ escalation:
     description: 信息模糊无法归档
   - name: explicit_user
     description: 用户显式触发（"我们定一下"）
+  - name: no_capture_intent        # v0.2.0 new
+    description: 用户没显式 /kb-capture，只是随口说 — 不存
 
 # ---------- review (D7) ----------
 review:
@@ -112,6 +138,15 @@ review:
     tentative_open: 5
   max_per_session: 10              # cap per review
 
+# ---------- external article (v0.2.0) ----------
+external:
+  schema: external_article
+  filename_pattern: "YYYY-MM-DD_<topic>_<slug>.md"
+  index_file: "_index.md"
+  default_topic: uncategorized
+  auto_mirror_palace: true
+  palace_wing: kb_external
+
 # ---------- recall (D8) ----------
 recall:
   inject_state_file_on_session_start: true
@@ -120,7 +155,8 @@ recall:
 
 # ---------- ticket format ----------
 ticket:
-  capture: "📌 记为 <type>: <slug>  source=<src>  confidence=<c>"
+  capture: "📌 /kb-capture → <type>: <slug>  source=<src>  confidence=<c>"
+  article: "📥 /kb-save-article → external/<filename>  topic=<topic>"
   conflict: "⚠️  CONFLICT with <other_slug>: <reason>"
   refine:   "🔗 REFINES <parent_slug>: <delta>"
   update:   "✏️  UPDATES <old_slug>: <change>"

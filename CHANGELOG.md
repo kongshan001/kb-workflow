@@ -5,6 +5,47 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-25
+
+### ⚠️ BREAKING CHANGES
+
+**Polarity flip: default is now NO auto-store.**
+
+- v0.1.x: assistant silently captured any input that matched heuristics
+- v0.2.0: assistant does NOT auto-store. User must explicitly invoke:
+  - `/kb-capture <text>` — for structured entries
+  - `/kb-save-article <url or text>` — for raw external content
+  - Natural phrases: "记住 X" / "别 X" / "以后 X" / "我决定 X"
+- Assistant MAY offer (one-line prompt) when it sees something worth saving,
+  but only if user didn't already invoke capture
+
+### Added
+- New slash command: `/kb-save-article` — proper external content flow
+- New slash command: `/kb-capture-force <type> <text>` — skip heuristics
+- `config/schema/external_article.yaml` — schema template for external articles
+- `external/_index.md` — auto-maintained index of articles
+- `config/defaults.yaml`: `capture.default_mode: active` + `capture.explicit_triggers`
+- Assistant can suggest (one-line prompt) instead of silently storing
+- D6 escalation: new trigger `no_capture_intent`
+
+### Fixed
+- `regen_palace.py`: now correctly parses nested `metadata:` frontmatter
+  (previously missed `source_url`, `topic`, `key_points`, etc.)
+- `kb-workflow status`: `external/` count now excludes `_index.md`
+- Ticket format: now prefixes with `/kb-capture →` and `/kb-save-article →`
+  for clarity of which command triggered the capture
+
+### Changed
+- Heuristics only run after explicit `/kb-capture` (was: every input)
+- `external/` is now a first-class storage target (was: empty placeholder)
+- Ticket format updated to reflect active-first model
+- SKILL.md: behavior contract section explicitly states active-first
+
+### Migration Notes from v0.1.x
+- Existing entries (captured under v0.1.x auto-store) are preserved as-is
+- New entries follow v0.2.0 active-first rules
+- If you want to backfill an entry to the new model: delete + re-`/kb-capture`
+
 ## [0.1.2] - 2026-07-25
 
 ### Added
@@ -46,7 +87,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - 10-topic starter whitelist
 - Sample tested end-to-end on demo1 project
 
-[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kongshan001/kb-workflow/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kongshan001/kb-workflow/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kongshan001/kb-workflow/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kongshan001/kb-workflow/releases/tag/v0.1.0

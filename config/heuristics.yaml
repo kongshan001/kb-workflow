@@ -1,11 +1,18 @@
 # Heuristic rules for auto-classification
-# 规则按优先级匹配；首条命中即定类型
+# v0.2.0: only used when user explicitly invokes /kb-capture
+# Auto-classification is NO LONGER run on every user input
 
 rules:
   - priority: 100
     name: explicit_decision
     type: decision
     pattern: "\\b(我们决定|我决定|敲定|定下来|选了|选了用|定为)\\b"
+
+  - priority: 95
+    name: force_override
+    type: <user-specified>
+    pattern: "^/kb-capture-force\\s+(fact|preference|decision|tentative)\\s+"
+    note: "/kb-capture-force <type> <text> 跳过启发式，强制归类"
 
   - priority: 90
     name: explicit_preference
@@ -21,6 +28,7 @@ rules:
     name: explicit_fact
     type: fact
     pattern: "^(https?://|www\\.)"
+    note: 短 URL 默认归 fact；如要保存原文用 /kb-save-article
 
   - priority: 70
     name: past_tense_fact
@@ -42,3 +50,7 @@ rules:
     type: fact
     pattern: ".*"
     note: 默认归类为 fact；模糊时升级为反问
+
+# v0.2.0: NOT triggered on every input
+# Only runs after user invokes /kb-capture
+trigger: explicit_only

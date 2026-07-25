@@ -20,7 +20,7 @@ else
 fi
 WORKFLOW_HOME="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
 
-VERSION="0.1.1-dev"
+VERSION="0.2.0-dev"
 
 # ---------- colors ----------
 if [[ -t 1 ]]; then
@@ -70,7 +70,8 @@ cmd_status() {
   # counts (precise: parse frontmatter type: field)
   local entries external conflicts tentative
   entries=$(find "$KB_ROOT/entries" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
-  external=$(find "$KB_ROOT/external" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+  # exclude underscore-prefixed files (e.g. _index.md) from external count
+  external=$(find "$KB_ROOT/external" -name "*.md" -type f ! -name "_*" 2>/dev/null | wc -l | tr -d ' ')
 
   # count entries by type (parse frontmatter "type:" field)
   local fact_n pref_n dec_n tent_n

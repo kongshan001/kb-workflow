@@ -1,0 +1,33 @@
+# Schema template: external_article
+# 适用：原始资料（URL 指向的文章、贴的整篇文档、会议记录等）
+# 路径：external/YYYY-MM-DD_<topic>_<slug>.md
+# 触发：/kb-save-article（v0.2.0 主路径）
+
+name: <YYYY-MM-DD>-<topic>-<slug>
+description: <一句话摘要>
+metadata:
+  type: external_article
+  source_url: <URL | "user-pasted">
+  ingested_at: <YYYY-MM-DD>
+  topic: <topic>
+  key_points:
+    - <要点 1>
+    - <要点 2>
+  linked_entries: []    # 反向引用：由此资料衍生的 fact/decision 等
+
+---
+
+# <标题>
+
+## 摘要
+<200 字以内总结>
+
+## 关键摘录
+- <原文摘录 1>
+- <原文摘录 2>
+
+## 完整正文
+<原文 / 链接 / 粘贴内容，可折叠>
+
+## 备注
+<用户自己加的批注>
