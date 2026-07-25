@@ -9,12 +9,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - `regen_palace.py --plan` / `--apply` modes — generates structured JSON manifest
   that the assistant can iterate to call `mempalace_add_drawer` for real mirroring
   (was: dry-run only, "would mirror")
+- `scripts/dedup.py` — semantic deduplication via ollama embeddings
+  (default: nomic-embed-text). Pairs above threshold get flagged
+  with options A/B/C/D (delete/refine/keep)
+- `install.sh`: registers weekly Sunday 18:00 /kb-review summary cron
+  via cc-connect (idempotent, graceful skip if cc-connect unavailable)
 - Fresh install verification: install.sh works in isolated HOME + KB_ROOT env
 - `specs/kb-workflow/plan.md` updated to v0.2.0 (D1 active-first, D2 external/,
   D4 trigger scope, D6 no_capture_intent, D8 external/ read, W2 slash set)
+- 5-scenario behavior contract documented
 
 ### Fixed
-- (no new fixes in this draft)
+- `regen_palace.py` now uses HTTP API for ollama (CLI subcommand missing
+  in some ollama versions)
+
+### Tested
+- `dedup.py` on existing 6 entries: found 0.909 conflict (verified
+  manual D5 detection) and 0.716 related pair (fact + decision on
+  same topic — different perspectives, valid to keep both)
 
 ## [0.2.0] - 2026-07-25
 

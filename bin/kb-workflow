@@ -20,7 +20,7 @@ else
 fi
 WORKFLOW_HOME="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
 
-VERSION="0.2.0-dev"
+VERSION="0.2.1-dev"
 
 # ---------- colors ----------
 if [[ -t 1 ]]; then

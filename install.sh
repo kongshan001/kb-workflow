@@ -143,6 +143,25 @@ if [[ -x "$SOURCE_PATH/scripts/capability-detect.sh" ]]; then
   "$SOURCE_PATH/scripts/capability-detect.sh" | sed 's/^/  /'
 fi
 
+# ---------- 7.5. cron registration (D7) ----------
+if command -v cc-connect >/dev/null 2>&1; then
+  log ""
+  log "⏰ Registering /kb-review weekly cron (Sunday 18:00, summary only)..."
+  # idempotent: cc-connect cron add returns error if exists; we tolerate
+  if cc-connect cron add \
+      --cron "0 18 * * 0" \
+      --prompt "/kb-review summary" \
+      --desc "kb-workflow weekly summary" \
+      2>/dev/null; then
+    ok "cron registered (Sunday 18:00)"
+  else
+    ok "cron already registered (skipped)"
+  fi
+else
+  warn "cc-connect not available; skip cron registration"
+  warn "to enable later: cc-connect cron add --cron '0 18 * * 0' --prompt '/kb-review summary'"
+fi
+
 # ---------- 8. record installed source ----------
 echo "$SOURCE_PATH" > "$KB_ROOT/.installed_source"
 
@@ -160,3 +179,6 @@ log "Next:"
 log "  kb-workflow status        # check current state"
 log "  Start a new Claude session to load the Skill"
 log "  /kb-review                # trigger a review (inside Claude)"
+log ""
+log "Weekly review (Sunday 18:00) is registered via cc-connect cron"
+log "if available. Disable: cc-connect cron del <job-id>"
