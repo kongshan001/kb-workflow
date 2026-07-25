@@ -37,10 +37,12 @@ description: KB 收录与管理工作流（active-first）。Use when user invok
 | **普通说话 / 提问 / 闲聊** | **不存**。按需要正常回答。 |
 | `/kb-capture <content>` | 存。启发式分类，4 类 schema，写入 entries/。 |
 | `/kb-save-article <url or text>` | 存。原始资料流：写 external/ + 镜像 MemPalace。 |
-| `记住 X` / `记一下 X` | 等同 `/kb-capture X` |
+| `收录 <url or path or text>` | 触发 capture（自动判 type） |
+| `收一下` / `记下` / `记住` / `记一下` / `保存` / `存这个` | 等同 `/kb-capture` |
 | `以后 X` / `别 X` / `永远 Y` | 等同 `/kb-capture X`（preference 信号） |
 | `我决定 X` / `我们敲定 Y` | 等同 `/kb-capture X`（decision 信号） |
 | `保存这篇文章 <url>` / `记下这个文档` | 等同 `/kb-save-article` |
+| `收录 <文件路径>`（如 `~/docs/notes.md`） | 助手 Read 文件 → 走 `/kb-capture` 流程 |
 | 用户讲一个看起来值得记的事，**但没明说** | **不存**。可提示："这条看起来像 X，要 /kb-capture 吗？"（一句话提示，不静默） |
 
 ### 什么**不**触发 capture
@@ -201,11 +203,13 @@ metadata:
 | `/kb-capture <text>` | **主存储入口**。启发式分类 → 写 entries/ → 打票据 |
 | `/kb-save-article <url or text>` | **原始资料入口**。写 external/ + 镜像 MemPalace |
 | `/kb-capture-force <type> <text>` | 跳过启发式，强制指定 type |
+| `/kb-recall <query>` | **召回入口**（诉求 2）。跨 entries/ + external/ 检索相关片段 |
 | `/kb-review` | 触发 D7 回顾 |
-| `/kb-search X` | 跨 entries/ + external/ + palace 检索 |
 | `/kb-status` | 打印当前状态摘要 |
 | `/kb-workflow update` | 拉新版 workflow |
 | `/kb-workflow config` | 编辑 `~/.claude/kb/config.local.yaml` |
+
+> 注：v0.2.1 之前 `/kb-search` 已被 `/kb-recall` 取代。`/kb-search` 仍可作为 alias。
 
 ---
 

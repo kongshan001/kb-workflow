@@ -6,6 +6,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **Natural language trigger "收录" + variants** (记下/记住/保存/存这个) added to defaults.yaml
+  - User can now say "收录 <url|path|text>" to trigger capture
+  - URL pattern → /kb-save-article flow
+  - File path pattern → Read tool + /kb-capture flow
+  - Plain text → /kb-capture flow with heuristic
+- **`scripts/recall.py`** — explicit recall (诉求 2)
+  - Text mode: keyword scoring (default)
+  - Embed mode: ollama nomic-embed-text cosine
+  - Returns ranked hits with file/snippet/score
+  - Test results: query "RAG 引擎" → RAGFlow article (52.0); query "shader 性能" → Spector.js pref + 2 decisions; embed "如何优化 Three.js shader" → 0.74/0.65/0.62
+- `/kb-recall <query>` slash command (replaces /kb-search in new code, /kb-search still works as alias)
+- 6-scenario behavior contract covering both user requirements end-to-end
+
+### Tested
+- recall.py text mode: 3 queries verified to surface relevant entries
+- recall.py embed mode: 1 query verified, returns semantically related content
+- File path detection in natural language triggers (regex `^/[\\w/.-]+\\.[a-z]+$` etc.)
+- URL pattern detection in natural language triggers
+
+## [0.2.1] - 2026-07-25
+
+### Added
 - `regen_palace.py --plan` / `--apply` modes — generates structured JSON manifest
   that the assistant can iterate to call `mempalace_add_drawer` for real mirroring
   (was: dry-run only, "would mirror")
@@ -110,7 +132,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - 10-topic starter whitelist
 - Sample tested end-to-end on demo1 project
 
-[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.2.2...HEAD
 [0.2.0]: https://github.com/kongshan001/kb-workflow/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kongshan001/kb-workflow/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kongshan001/kb-workflow/compare/v0.1.0...v0.1.1

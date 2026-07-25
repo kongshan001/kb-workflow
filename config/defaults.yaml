@@ -75,16 +75,39 @@ capture:
       - /kb-save-article
       - /kb-capture-force
     natural_phrases:
+      # 主 capture 触发
+      - "收录"
+      - "收一下"
+      - "记下"
       - "记住"
       - "记一下"
+      - "保存"
+      - "存一下"
+      - "存这个"
+      # preference 信号
       - "别"
       - "不要"
       - "以后"
       - "以后都"
       - "永远"
+      # decision 信号
+      - "我决定"
+      - "我们敲定"
+      - "决定"
+      # english equivalents
       - "avoid"
       - "always"
       - "remember"
+      - "save this"
+      - "capture"
+    file_path_patterns:
+      # 路径型输入 → 自动 Read 文件再 capture
+      - "^/[\\w/.-]+\\.[a-z]+$"          # /absolute/path.ext
+      - "^~/[\\w/.-]+\\.[a-z]+$"         # ~/relative/path.ext
+      - "^\\./[\\w/.-]+\\.[a-z]+$"       # ./relative.ext
+    url_pattern:
+      - "^https?://"                      # http(s)://... → /kb-save-article flow
+      - "^www\\."
   offer_suggestion: true          # when ambiguous, prompt "要 /kb-capture 吗？"
   offer_threshold_confidence: 0.7  # only suggest if assistant is fairly sure it's worth saving
 
