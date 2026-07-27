@@ -10,16 +10,29 @@
 set -euo pipefail
 
 # ---------- resolve KB_ROOT + workflow home ----------
-# KB_ROOT auto-detection (v0.3.4 — supports --local install):
-#   1. KB_ROOT env var (explicit override, always wins)
-#   2. cwd-relative: walk up from SCRIPT_DIR looking for .claude/kb/
-#      (handles project-local install at ./.claude/kb/)
-#   3. global default: ~/.claude/kb/
+# v0.3.4: All paths overridable via env vars (Windows / sandboxed / multi-KB use cases).
+#
+# Env vars (highest priority):
+#   KB_ROOT               — KB data dir (entries/, external/, _state.md)
+#   KB_WORKFLOW_HOME      — skill source dir (where SKILL.md lives)
+#   KB_STATE_FILE         — override _state.md path
+#   KB_CONFIG_FILE        — override config.local.yaml path
+#   KB_INDEX_FILE         — override external/_index.md path
+#   KB_SKILL_DIR          — override skill install dir (for status banner)
+#   KB_CLI_DIR            — override CLI install dir (for status banner)
+#
+# Resolution chain (when env not set):
+#   1. KB_ROOT env (always wins)
+#   2. walk-up from SCRIPT_DIR looking for .claude/kb/
+#   3. project-local fallback: <cwd>/.claude/kb/
+#   4. global default: $HOME/.claude/kb/
+#
+# (config.local.yaml paths: block is parsed by scripts/recall.py and
+# scripts/forget.py — see defaults.yaml `paths:` section.)
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 
 if [[ -z "${KB_ROOT:-}" ]]; then
-  # walk up from SCRIPT_DIR to find project-local .claude/kb/
   CANDIDATE="$SCRIPT_DIR"
   KB_ROOT=""
   while [[ "$CANDIDATE" != "/" ]]; do
@@ -33,6 +46,12 @@ if [[ -z "${KB_ROOT:-}" ]]; then
     KB_ROOT="$HOME/.claude/kb"
   fi
 fi
+
+# Derived paths (env overrides win over derived defaults)
+KB_STATE_FILE="${KB_STATE_FILE:-$KB_ROOT/_state.md}"
+KB_CONFIG_FILE="${KB_CONFIG_FILE:-$KB_ROOT/config.local.yaml}"
+KB_INDEX_FILE="${KB_INDEX_FILE:-$KB_ROOT/external/_index.md}"
+export KB_STATE_FILE KB_CONFIG_FILE KB_INDEX_FILE
 
 # Resolve WORKFLOW_HOME via fallback chain (v0.3.4 Windows-aware):
 #   1. POSIX symlink resolution (readlink -f)
