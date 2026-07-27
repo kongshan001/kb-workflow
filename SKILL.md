@@ -473,7 +473,7 @@ metadata:
 | `/kb-capture <text>` | **主存储入口**。启发式分类 → 写 entries/ → 打票据 |
 | `/kb-save-article <url or text>` | **原始资料入口**。D1 路由 + D9 pipeline → 写 external/ + 索引同步 + 镜像 MemPalace |
 | `/kb-capture-force <type> <text>` | 跳过启发式，强制指定 type |
-| `/kb-recall <query>` | **召回入口**（诉求 2）。跨 entries/ + external/ 检索相关片段。v0.3.4 加 `--format json` 给 Claude 合成用 + `--topic` 过滤 |
+| `/kb-recall <query>` | **召回入口**（诉求 2）。跨 entries/ + external/ 检索相关片段。v0.3.4 加 `--format json` 给 Claude 合成用 + `--topic` 过滤。v0.4.3 加 `--mode hybrid`（text + embed 加权融合） |
 | `/kb-forget <slug>` | **v0.3.2 新增：软删除条目**。详见下方 D12。语义对齐 cognee 的 `forget(dataset_id)` |
 | `/kb-review` | 触发 D7 回顾 |
 | `/kb-status` | 打印当前状态摘要（entries / external / 待裁定 / tentative / index drift 检查） |
@@ -483,12 +483,37 @@ metadata:
 
 > 注：v0.2.1 之前 `/kb-search` 已被 `/kb-recall` 取代。`/kb-search` 仍可作为 alias。
 
+### `/kb-recall` 模式选择（v0.4.3）
+
+```
+--mode text    (default): BM25-like 关键词密度，无外部依赖
+--mode embed   : ollama cosine（需本地 ollama + nomic-embed-text 模型）
+--mode hybrid  (推荐): 0.3 * text_norm + 0.7 * embed — 两者加权融合
+                      text-mode 精确术语强，embed-mode 语义概念强
+                      无 ollama 时自动 fallback 到 text-only
+```
+
+何时用哪种：
+- 精确术语（"pybind11" "FFI"）：text 或 hybrid
+- 语义概念（"RAG 怎么选" "memory 架构"）：embed 或 hybrid
+- 不确定：hybrid
+- 没装 ollama：text（hybrid 自动降级）
+
+实测对比（query: "RAG"）：
+| Rank | text-mode | hybrid | embed-mode |
+|------|-----------|--------|------------|
+| 1 | awesome-llm-apps (97) | awesome-llm-apps (0.58) | ragflow-intro (0.60) |
+| 2 | rag-quality-parsing (75) | rag-quality-parsing (0.52) | rag-quality-parsing (0.45) |
+| 3 | ragflow-intro (43) | ragflow-intro (0.51) | ... |
+
+hybrid 平衡：awesome-llm-apps 因"RAG"出现多次排前（text 优势）；ragflow-intro 语义最纯也上来（embed 优势）。
+
 ### `/kb-recall` v0.3.4 合成用模式（assistanthandoff）
 
 当 assistant 需要把 KB 内容合成进回答时，**用 `--format json`** 拿结构化结果，而不是解析文本输出：
 
 ```bash
-/kb-recall "memory agent long-term" --topic llm-memory --format json --limit 5
+/kb-recall "memory agent long-term" --topic llm-memory --mode hybrid --format json --limit 5
 ```
 
 返回结构（每条带 citation，**方便评估 KB 内容是否有错误**）：
