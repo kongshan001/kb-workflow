@@ -195,6 +195,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Fixed
+- **P1-④ retry: capability-detect network probe** (v0.4.2) — probed
+  `https://github.com` (root domain, not a git repo) → `ls-remote`
+  always failed with "repository not found" regardless of network state.
+  Fix: probe a specific repo: `$KB_WORKFLOW_REPO` or fallback to
+  `https://github.com/git/git.git`. User verified 5/6 fixed in
+  commit `b6f5c12`; this completes the 6th.
 - **6 bugs from issue #1 (Windows 部署测试报告)** (v0.4.1):
   - **P0-①**: `install.sh make_link` cp fallback added `-rf` (was `-f`,
     fails on dir sources like `config/`) + same-source-dest no-op +

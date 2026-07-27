@@ -60,12 +60,13 @@ else
 fi
 
 # ---------- network ----------
-# v0.4.1 (issue #1 P1-④): use git ls-remote as primary — actual workflow
-# needs git network anyway. curl probe was misleading (could pass while
-# git was behind proxy, or vice versa).
+# v0.4.2 (issue #1 P1-④ retry): probe a SPECIFIC git repo, not github.com
+# root domain (which is not a git repo, so ls-remote always fails with
+# "repository not found" regardless of network state).
+PROBE_REPO="${KB_WORKFLOW_REPO:-https://github.com/git/git.git}"
 if command -v git >/dev/null 2>&1; then
-  if git ls-remote --heads --quiet https://github.com 2>/dev/null; then
-    ok "network" "reachable (git ls-remote)"
+  if git ls-remote --heads --quiet "$PROBE_REPO" >/dev/null 2>&1; then
+    ok "network" "reachable (git ls-remote $PROBE_REPO)"
   else
     off "network" "unreachable (update check disabled)"
   fi
