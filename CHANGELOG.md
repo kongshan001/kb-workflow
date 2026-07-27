@@ -195,6 +195,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **`recall.py` snippet anchoring + citations + JSON output** (v0.3.4) —
+  search results now include:
+  - `section_anchor` — nearest preceding `## heading` (citation context)
+  - `topic` / `source_url` / `last_seen` per hit (full provenance)
+  - snippet window anchored to first query term match (~400 chars)
+  - `--format json` option for machine-readable synthesis by assistant
+  - `--format text` (default) preserves human-friendly emoji output
 - **`KB_HOME` single-root env var** (v0.3.4, XDG-style) — all KB paths
   derive from `KB_HOME` unless individually overridden (CARGO_HOME / XDG_DATA_HOME
   / Obsidian vault pattern). Priority chain: per-path env > KB_HOME > walk-up

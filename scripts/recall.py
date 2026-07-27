@@ -44,32 +44,72 @@ def collect_files():
     return files
 
 
-def extract_snippet(body: str, query: str, max_len: int = 300) -> str:
-    """Find best matching snippet in body."""
+def find_section_heading(body: str, pos: int) -> str:
+    """Find the nearest preceding ## heading above position `pos`.
+
+    Used as a citation anchor — tells the assistant "this match is in section X".
+    """
+    if pos < 0:
+        return ""
+    # scan backwards from pos to find last ## heading
+    head = body[:pos]
+    headings = re.findall(r"^(#{1,3})\s+(.+)$", head, re.MULTILINE)
+    if not headings:
+        return ""
+    # last heading wins
+    _, title = headings[-1]
+    return title.strip()
+
+
+def extract_snippet(body: str, query: str, max_len: int = 400) -> str:
+    """Find best matching snippet in body, anchored to query term occurrence.
+
+    v0.3.4 upgrade:
+    - anchors to first query term match (was: first paragraph if no match)
+    - preserves nearest preceding ## heading as citation context
+    - returns ~max_len chars centered on match (was: max_len from start)
+    - returns (snippet, anchor) — caller can combine as needed
+    """
     q = query.lower()
     body_lower = body.lower()
-    # try to find query terms in body
     terms = [t for t in re.split(r"\s+", q) if len(t) > 1]
+
+    # find best matching position (earliest query term occurrence)
     best_pos = -1
+    best_term = ""
     for term in terms:
         pos = body_lower.find(term.lower())
         if pos != -1 and (best_pos == -1 or pos < best_pos):
             best_pos = pos
+            best_term = term
+
     if best_pos == -1:
-        # no match, return first paragraph
+        # no match — return first non-heading paragraph
         for line in body.splitlines():
             s = line.strip()
             if s and not s.startswith("#"):
-                return s[:max_len]
-        return body[:max_len]
-    start = max(0, best_pos - 50)
+                return "", s[:max_len]
+        return "", body[:max_len]
+
+    # context window centered on match
+    start = max(0, best_pos - 80)
     end = min(len(body), best_pos + max_len)
     snippet = body[start:end].strip()
     if start > 0:
+        # find a good cut point (newline)
+        cut = snippet.find("\n\n")
+        if cut > 0 and cut < 80:
+            snippet = snippet[cut + 2:].lstrip()
         snippet = "..." + snippet
     if end < len(body):
-        snippet = snippet + "..."
-    return snippet
+        snippet = snippet.rstrip() + "..."
+
+    anchor = find_section_heading(body, best_pos)
+    return anchor, snippet
+
+
+def score_text(content: str, query: str) -> float:
+    """Naive keyword-based relevance score."""
 
 
 def score_text(content: str, query: str) -> float:
@@ -117,6 +157,27 @@ def get_topic(meta: dict) -> str:
     return ""
 
 
+def _build_hit(file_path, meta, body, score, anchor, snippet, query):
+    """Build a single hit dict with full citation metadata (v0.3.4)."""
+    metadata = meta.get("metadata", {}) if isinstance(meta.get("metadata"), dict) else {}
+    last_seen = metadata.get("last_seen") or meta.get("last_seen") or ""
+    # coerce date to ISO string (last_seen can be date object via PyYAML)
+    if hasattr(last_seen, "isoformat"):
+        last_seen = last_seen.isoformat()
+    return {
+        "file": str(file_path),
+        "name": file_path.stem,
+        "type": meta.get("type", "external_article"),
+        "description": meta.get("description", ""),
+        "topic": get_topic(meta) or "",
+        "source_url": metadata.get("source_url", "") or meta.get("source_url", ""),
+        "last_seen": last_seen,
+        "section_anchor": anchor or "",
+        "snippet": snippet,
+        "score": score,
+    }
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("query", help="search query")
@@ -125,6 +186,8 @@ def main():
     p.add_argument("--limit", type=int, default=5)
     p.add_argument("--kb-root", type=Path, default=None)
     p.add_argument("--topic", default=None, help="v0.3.3: filter by topic (e.g. llm-memory, rag, ml)")
+    p.add_argument("--format", choices=["text", "json"], default="text",
+                   help="v0.3.4: text (human) or json (machine — for assistant synthesis)")
     args = p.parse_args()
 
     global KB_ROOT, ENTRIES_DIR, EXTERNAL_DIR
@@ -135,7 +198,10 @@ def main():
 
     files = collect_files()
     if not files:
-        print("  ℹ️  no KB files to search")
+        if args.format == "json":
+            print(json.dumps({"query": args.query, "hits": []}, ensure_ascii=False, indent=2))
+        else:
+            print("  ℹ️  no KB files to search")
         return 0
 
     # v0.3.3: topic filter — preload frontmatter for all files
@@ -155,7 +221,11 @@ def main():
             # else: skip (topic mismatch)
         files = filtered
         if not files:
-            print(f"  ℹ️  no files match topic={args.topic!r}")
+            if args.format == "json":
+                print(json.dumps({"query": args.query, "topic": args.topic, "hits": []},
+                                 ensure_ascii=False, indent=2))
+            else:
+                print(f"  ℹ️  no files match topic={args.topic!r}")
             return 0
 
     hits = []
@@ -174,41 +244,64 @@ def main():
             except Exception:
                 continue
             score = cosine(qvec, fvec)
-            hits.append({
-                "file": str(f),
-                "name": f.stem,
-                "type": meta.get("type", "external_article"),
-                "description": meta.get("description", ""),
-                "snippet": extract_snippet(body, args.query),
-                "score": score,
-            })
+            anchor, snippet = extract_snippet(body, args.query)
+            hits.append(_build_hit(f, meta, body, score, anchor, snippet, args.query))
     else:
         # text mode: keyword scoring
         for f in files:
             content = f.read_text(encoding="utf-8", errors="ignore")
             meta, body = parse_frontmatter(content)
             score = score_text(content, args.query)
-            hits.append({
-                "file": str(f),
-                "name": f.stem,
-                "type": meta.get("type", "external_article"),
-                "description": meta.get("description", ""),
-                "snippet": extract_snippet(body, args.query),
-                "score": score,
-            })
+            anchor, snippet = extract_snippet(body, args.query)
+            hits.append(_build_hit(f, meta, body, score, anchor, snippet, args.query))
 
     hits.sort(key=lambda h: h["score"], reverse=True)
     hits = hits[:args.limit]
 
     if not hits or hits[0]["score"] == 0:
-        print(f"  ℹ️  no matches for: {args.query}")
+        if args.format == "json":
+            print(json.dumps({"query": args.query, "hits": []}, ensure_ascii=False, indent=2))
+        else:
+            print(f"  ℹ️  no matches for: {args.query}")
+        return 0
+
+    if args.format == "json":
+        # machine-readable: query + per-hit citation metadata + snippet
+        out = {
+            "query": args.query,
+            "topic": args.topic if topic_filtered else None,
+            "mode": args.mode,
+            "total_hits": len(hits),
+            "hits": [
+                {
+                    "rank": i + 1,
+                    "name": h["name"],
+                    "type": h["type"],
+                    "score": round(h["score"], 2),
+                    "topic": h["topic"],
+                    "source_url": h["source_url"],
+                    "file": h["file"],
+                    "last_seen": h["last_seen"],
+                    "section_anchor": h["section_anchor"],
+                    "snippet": h["snippet"],
+                }
+                for i, h in enumerate(hits)
+            ],
+        }
+        print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0
 
     filter_label = f" [topic={args.topic}]" if topic_filtered else ""
     print(f"  🔍 {len(hits)} hit(s) for: {args.query}{filter_label}\n")
     for i, h in enumerate(hits, 1):
+        meta_line = f"  topic: {h['topic'] or '?'}"
+        if h["source_url"]:
+            meta_line += f"  src: {h['source_url']}"
         print(f"─── {i}. [{h['type']}] {h['name']} (score {h['score']:.2f}) ───")
         print(f"  {h['description']}")
+        if h["section_anchor"]:
+            print(f"  § section: {h['section_anchor']}")
+        print(meta_line)
         print(f"  📁 {h['file']}")
         print(f"  💬 {h['snippet']}")
         print()
