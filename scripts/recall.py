@@ -183,7 +183,7 @@ def _build_hit(file_path, meta, body, score, anchor, snippet, query):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("query", help="search query")
-    p.add_argument("--mode", choices=["text", "embed"], default="text")
+    p.add_argument("--mode", choices=["text", "embed", "hybrid"], default="text")
     p.add_argument("--model", default="nomic-embed-text")
     p.add_argument("--limit", type=int, default=5)
     p.add_argument("--kb-root", type=Path, default=None)
@@ -231,31 +231,59 @@ def main():
             return 0
 
     hits = []
-    if args.mode == "embed":
+    # v0.4.3: --mode hybrid — combine text + embed scores, weighted 0.3/0.7
+    # text-mode catches keyword matches (e.g. "pybind11" "FFI")
+    # embed-mode catches semantic matches (e.g. "RAG quality" finds rag-quality-parsing)
+    # Hybrid ranks files in BOTH highest; files in only one ranked next
+    run_embed = args.mode in ("embed", "hybrid")
+    run_text = args.mode in ("text", "hybrid")
+
+    file_data = {}
+    for f in files:
+        content = f.read_text(encoding="utf-8", errors="ignore")
+        meta, body = parse_frontmatter(content)
+        file_data[f] = {"meta": meta, "body": body}
+
+    text_scores = {}
+    if run_text:
+        for f, d in file_data.items():
+            text_scores[f] = score_text(d["meta"].get("description", "") + " " + d["body"], args.query)
+
+    embed_scores = {}
+    if run_embed:
         try:
             qvec = embed_ollama(args.query, args.model)
         except Exception as e:
-            print(f"  ❌ ollama embed failed: {e}", file=sys.stderr)
-            return 1
-        for f in files:
-            content = f.read_text(encoding="utf-8", errors="ignore")
-            meta, body = parse_frontmatter(content)
-            text = (meta.get("description", "") + " " + body)[:1000]
-            try:
-                fvec = embed_ollama(text, args.model)
-            except Exception:
-                continue
-            score = cosine(qvec, fvec)
-            anchor, snippet = extract_snippet(body, args.query)
-            hits.append(_build_hit(f, meta, body, score, anchor, snippet, args.query))
-    else:
-        # text mode: keyword scoring
-        for f in files:
-            content = f.read_text(encoding="utf-8", errors="ignore")
-            meta, body = parse_frontmatter(content)
-            score = score_text(content, args.query)
-            anchor, snippet = extract_snippet(body, args.query)
-            hits.append(_build_hit(f, meta, body, score, anchor, snippet, args.query))
+            if args.mode == "hybrid":
+                print(f"  ⚠️  ollama embed failed ({e}); hybrid falling back to text-only", file=sys.stderr)
+                run_embed = False
+            else:
+                print(f"  ❌ ollama embed failed: {e}", file=sys.stderr)
+                return 1
+        if run_embed:
+            for f, d in file_data.items():
+                text = (d["meta"].get("description", "") + " " + d["body"])[:1000]
+                try:
+                    fvec = embed_ollama(text, args.model)
+                except Exception:
+                    continue
+                embed_scores[f] = cosine(qvec, fvec)
+
+    max_text = max(text_scores.values()) if text_scores else 1.0
+    if max_text == 0:
+        max_text = 1.0
+    for f in files:
+        ts = text_scores.get(f, 0.0)
+        es = embed_scores.get(f, 0.0)
+        ts_norm = ts / max_text if max_text > 0 else 0.0
+        if run_embed and run_text:
+            score = 0.3 * ts_norm + 0.7 * es
+        elif run_embed:
+            score = es
+        else:
+            score = ts
+        anchor, snippet = extract_snippet(file_data[f]["body"], args.query)
+        hits.append(_build_hit(f, file_data[f]["meta"], file_data[f]["body"], score, anchor, snippet, args.query))
 
     hits.sort(key=lambda h: h["score"], reverse=True)
     hits = hits[:args.limit]

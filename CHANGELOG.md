@@ -194,6 +194,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **`recall.py --mode hybrid`** (v0.4.3) — combine text + embed scores
+  with weighted combo (0.3 * text_norm + 0.7 * embed_cosine). Files in
+  BOTH rank highest; gracefully falls back to text-only if ollama is
+  unavailable (warns to stderr). Use case: keyword density (text-mode)
+  misses semantic matches; semantic-only (embed-mode) misses exact
+  keyword hits. Hybrid gets both.
+
 ### Fixed
 - **install.sh default scope** (v0.4.3) — user reported "default still
   installs to global even when in project dir". Two real issues:
