@@ -137,15 +137,42 @@ kb-workflow status
 | 命令 | 做什么 |
 |---|---|
 | `/kb-review` | 触发 D7 回顾：⚠️ 待裁定 + 🟡 Tentative + 最近收录 |
-| `/kb-search X` | 跨 entries/ + external/ + MemPalace 检索 |
+| `/kb-search X` / `/kb-recall X` | 跨 entries/ + external/ 检索（v0.3.4 加 `--format json` 和 `--topic` 过滤） |
 | `/kb-status` | 看当前状态（统计、队列、能力） |
 | `/kb-workflow update` | 拉新版 workflow |
 | `/kb-workflow config` | 编辑 `config.local.yaml` |
 
 **自然语言等价**：
 - "回顾一下" / "看看都记了啥" → `/kb-review`
-- "查一下 X" / "KB 里有没有 X" → `/kb-search X`
+- "查一下 X" / "KB 里有没有 X" → `/kb-recall X`
 - "KB 现在啥情况" → `/kb-status`
+
+### `/kb-recall` 召回模式
+
+```bash
+# 人类可读（emoji 格式）
+/kb-recall "memory agent long-term" --limit 5
+
+# 结构化（推荐 — Claude 合成用）
+/kb-recall "memory agent long-term" --topic llm-memory --format json --limit 5
+
+# 限定主题（避免 noise）
+/kb-recall "Python 数据模型" --topic ml
+
+# 嵌入模式（更准，需要本地 ollama 跑 nomic-embed-text）
+/kb-recall "agent memory" --mode embed
+```
+
+**`--format json` 返回字段**（每条 KB 命中）：
+
+- `name` / `file` — 文件路径
+- `topic` / `source_url` — 主题 + 原 URL（**点击验证 KB 内容是否有错**）
+- `last_seen` — 最近核对日期（**评估时效性**）
+- `section_anchor` — 命中的最近 `##` 段落标题（**说明这段在哪**）
+- `snippet` — 锚定到 query term 的内容窗口
+- `score` — 相关度评分
+
+Claude 拿到 JSON 后会：读 `rank 1-3` 的 `snippet` + `section_anchor` + `source_url` → **每条结论带 `[name § section_anchor]` 引用** → 用户问"你怎么知道"时直接给 `source_url` 让用户验证。
 
 ---
 

@@ -420,7 +420,7 @@ metadata:
 | `/kb-capture <text>` | **主存储入口**。启发式分类 → 写 entries/ → 打票据 |
 | `/kb-save-article <url or text>` | **原始资料入口**。D1 路由 + D9 pipeline → 写 external/ + 索引同步 + 镜像 MemPalace |
 | `/kb-capture-force <type> <text>` | 跳过启发式，强制指定 type |
-| `/kb-recall <query>` | **召回入口**（诉求 2）。跨 entries/ + external/ 检索相关片段 |
+| `/kb-recall <query>` | **召回入口**（诉求 2）。跨 entries/ + external/ 检索相关片段。v0.3.4 加 `--format json` 给 Claude 合成用 + `--topic` 过滤 |
 | `/kb-forget <slug>` | **v0.3.2 新增：软删除条目**。详见下方 D12。语义对齐 cognee 的 `forget(dataset_id)` |
 | `/kb-review` | 触发 D7 回顾 |
 | `/kb-status` | 打印当前状态摘要（entries / external / 待裁定 / tentative / index drift 检查） |
@@ -429,6 +429,45 @@ metadata:
 | `/kb-workflow config` | 编辑 `~/.claude/kb/config.local.yaml` |
 
 > 注：v0.2.1 之前 `/kb-search` 已被 `/kb-recall` 取代。`/kb-search` 仍可作为 alias。
+
+### `/kb-recall` v0.3.4 合成用模式（assistanthandoff）
+
+当 assistant 需要把 KB 内容合成进回答时，**用 `--format json`** 拿结构化结果，而不是解析文本输出：
+
+```bash
+/kb-recall "memory agent long-term" --topic llm-memory --format json --limit 5
+```
+
+返回结构（每条带 citation，**方便评估 KB 内容是否有错误**）：
+
+```json
+{
+  "query": "memory agent long-term",
+  "topic": "llm-memory",
+  "mode": "text",
+  "total_hits": 2,
+  "hits": [{
+    "rank": 1,
+    "name": "2026-07-26_rag_mem0",
+    "score": 90.0,
+    "topic": "llm-memory",
+    "source_url": "https://github.com/mem0ai/mem0",    ← 可点击验证
+    "file": "/Users/ks_128/.claude/kb/external/...",
+    "last_seen": "2026-07-26",                       ← 评估时效性
+    "section_anchor": "mem0 — AI Agent 通用记忆层",  ← 知道是哪个段落
+    "snippet": "# mem0 — AI Agent 通用记忆层\n\n## 摘要\n..." ← 内容片段
+  }]
+}
+```
+
+assistant 合成 pattern：
+
+1. 读 JSON → 取 `rank 1, 2, 3` 的 `snippet` + `section_anchor` + `source_url`
+2. **答案必须 cite 每条**：说"根据 [name § section_anchor]..."
+3. 用户问"你怎么知道 X？"→ 直接给 `source_url` 验证
+4. 用户怀疑"这个 KB 内容对吗？"→ assistant 用 `file` 路径 `cat` 验证原文
+
+不推荐用文本输出做合成（emoji/分隔符会被吃掉，section 上下文丢失）。
 
 ---
 
