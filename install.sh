@@ -1,28 +1,25 @@
 #!/usr/bin/env bash
-# install.sh - KB workflow one-click installer
+# install.sh - KB workflow one-click installer (v0.3.4 with --local / --global)
 #
 # Usage:
-#   curl -fsSL <url>/install.sh | bash              # install from GitHub
-#   ./install.sh                                    # install from current dir (local dev)
-#   ./install.sh /path/to/local/repo                # install from specific local path
+#   ./install.sh                              # interactive: choose global or project-local
+#   ./install.sh --global                     # install to ~/.claude/skills/kb-workflow/ (default)
+#   ./install.sh --local                      # install to ./.claude/skills/kb-workflow/ (project)
+#   ./install.sh --local --kb-root <path>     # project-local with custom KB root
+#   ./install.sh --global --uninstall         # uninstall (global mode by default)
+#   ./install.sh /path/to/local/repo          # install from explicit source path
 #
-# What it does:
-#   1. Detects source (local path or GitHub clone)
-#   2. Creates ~/.claude/kb/ structure
-#   3. Symlinks CLI to ~/.local/bin/kb-workflow
-#   4. Symlinks SKILL.md to ~/.claude/skills/kb-workflow/
-#   5. Generates config.local.yaml if missing
-#   6. Runs capability detection
-#   7. Prints status banner
+# Install scopes:
+#   --global  (default): ~/.claude/skills/, ~/.local/bin/, ~/.claude/kb/
+#                      KB travels across projects — knowledge persists between repos
+#   --local            : ./.claude/skills/, ./bin/, ./.claude/kb/
+#                      KB stays in project — isolated, can be gitignored
+#
+# Detection chain in bin/kb-workflow (v0.3.4 Windows-aware):
+#   readlink → .installed_source → heuristic (../ from script dir)
+#   → KB_ROOT auto-detect: KB_ROOT env > cwd .claude/kb/ > ~/.claude/kb/
 
 set -euo pipefail
-
-# ---------- config ----------
-GITHUB_REPO="${KB_WORKFLOW_REPO:-https://github.com/kongshan001/kb-workflow.git}"
-WORKFLOW_HOME="${KB_WORKFLOW_HOME:-$HOME/kb-workflow}"
-KB_ROOT="${KB_ROOT:-$HOME/.claude/kb}"
-SKILL_DIR="$HOME/.claude/skills/kb-workflow"
-LOCAL_BIN="$HOME/.local/bin"
 
 # ---------- helpers ----------
 log() { printf '%b\n' "$*"; }
@@ -52,11 +49,70 @@ make_link() {
 command -v git   >/dev/null 2>&1 || fail "git is required but not installed"
 command -v bash >/dev/null 2>&1 || fail "bash is required"
 
+# ---------- 0. parse flags + pick install scope ----------
+SCOPE=""        # "global" or "local" — empty means "ask"
+UNINSTALL=0
+SOURCE_ARG=""
+CUSTOM_KB_ROOT="${KB_ROOT:-}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --global)  SCOPE="global"; shift ;;
+    --local|--project) SCOPE="local"; shift ;;
+    --uninstall) UNINSTALL=1; shift ;;
+    --kb-root) CUSTOM_KB_ROOT="$2"; shift 2 ;;
+    -h|--help)
+      sed -n '2,28p' "$0"; exit 0 ;;
+    --*) fail "unknown flag: $1" ;;
+    *)  SOURCE_ARG="$1"; shift ;;
+  esac
+done
+
+# interactive scope prompt (only when no flag AND stdin is a TTY)
+if [[ -z "$SCOPE" && -t 0 ]]; then
+  log ""
+  log "  Where should kb-workflow install?"
+  log ""
+  log "    [G]  Global   — ~/.claude/skills/kb-workflow/ + ~/.claude/kb/"
+  log "             KB travels across projects (default)"
+  log ""
+  log "    [L]  Local    — \${PWD}/.claude/skills/kb-workflow/ + \${PWD}/.claude/kb/"
+  log "             KB stays in this project (gitignore the .claude/kb/)"
+  log ""
+  read -r -p "  Choose [G/L, default=G]: " choice
+  case "${choice,,}" in
+    l|local|project) SCOPE="local" ;;
+    *)               SCOPE="global" ;;
+  esac
+elif [[ -z "$SCOPE" ]]; then
+  # non-interactive (CI / piped): default global, warn
+  warn "non-interactive install — defaulting to --global"
+  warn "  pass --local explicitly for project-scoped install"
+  SCOPE="global"
+fi
+
+# ---------- compute install paths based on scope ----------
+if [[ "$SCOPE" == "local" ]]; then
+  PROJECT_ROOT="$(pwd)"
+  KB_ROOT="${CUSTOM_KB_ROOT:-$PROJECT_ROOT/.claude/kb}"
+  SKILL_DIR="$PROJECT_ROOT/.claude/skills/kb-workflow"
+  LOCAL_BIN="$PROJECT_ROOT/bin"
+  ok "scope: project-local (paths under $PROJECT_ROOT)"
+else
+  KB_ROOT="${CUSTOM_KB_ROOT:-$HOME/.claude/kb}"
+  SKILL_DIR="$HOME/.claude/skills/kb-workflow"
+  LOCAL_BIN="$HOME/.local/bin"
+  ok "scope: global (paths under \$HOME)"
+fi
+
 # ---------- 1. detect source ----------
 SOURCE_PATH=""
-if [[ -n "${1:-}" ]]; then
+GITHUB_REPO="${KB_WORKFLOW_REPO:-https://github.com/kongshan001/kb-workflow.git}"
+WORKFLOW_HOME="${KB_WORKFLOW_HOME:-$HOME/kb-workflow}"
+
+if [[ -n "$SOURCE_ARG" ]]; then
   # explicit local path
-  SOURCE_PATH="$(cd "$1" && pwd)"
+  SOURCE_PATH="$(cd "$SOURCE_ARG" && pwd)"
   log "📦 Local install from: $SOURCE_PATH"
 elif [[ -f "./SKILL.md" && -f "./bin/kb-workflow" ]]; then
   # running from inside the repo
@@ -88,6 +144,22 @@ case "$(uname -s 2>/dev/null)" in
     ;;
 esac
 
+# ---------- 1.5. uninstall mode ----------
+if [[ $UNINSTALL -eq 1 ]]; then
+  log ""
+  log "🗑️  Uninstalling kb-workflow ($SCOPE)..."
+  # remove skill symlinks (rm works on real files + symlinks + dangling links)
+  rm -f "$SKILL_DIR/SKILL.md" "$SKILL_DIR/config" "$SKILL_DIR/CHANGELOG.md"
+  rmdir "$SKILL_DIR" 2>/dev/null || true
+  # remove CLI
+  rm -f "$LOCAL_BIN/kb-workflow" "$LOCAL_BIN/.installed_source"
+  rmdir "$LOCAL_BIN" 2>/dev/null || true
+  ok "removed: skill, CLI, .installed_source"
+  # KB_ROOT: keep by default unless --purge
+  warn "KB kept at: $KB_ROOT (pass --purge to also remove)"
+  exit 0
+fi
+
 # ---------- 2. create KB root ----------
 mkdir -p "$KB_ROOT/entries" "$KB_ROOT/external"
 ok "KB root: $KB_ROOT"
@@ -106,11 +178,13 @@ fi
 echo "$SOURCE_PATH" > "$LOCAL_BIN/.installed_source"
 ok ".installed_source written: $SOURCE_PATH"
 
-# ensure ~/.local/bin is on PATH for this session
-case ":$PATH:" in
-  *":$LOCAL_BIN:"*) ;;
-  *) warn "$LOCAL_BIN not in PATH; add it to your shell rc" ;;
-esac
+# ensure ~/.local/bin is on PATH (only for global install)
+if [[ "$SCOPE" == "global" ]]; then
+  case ":$PATH:" in
+    *":$LOCAL_BIN:"*) ;;
+    *) warn "$LOCAL_BIN not in PATH; add it to your shell rc" ;;
+  esac
+fi
 
 # ---------- 4. symlink Skill ----------
 mkdir -p "$HOME/.claude/skills" "$SKILL_DIR"

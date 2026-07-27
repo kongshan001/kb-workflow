@@ -10,9 +10,29 @@
 set -euo pipefail
 
 # ---------- resolve KB_ROOT + workflow home ----------
-KB_ROOT="${KB_ROOT:-$HOME/.claude/kb}"
+# KB_ROOT auto-detection (v0.3.4 — supports --local install):
+#   1. KB_ROOT env var (explicit override, always wins)
+#   2. cwd-relative: walk up from SCRIPT_DIR looking for .claude/kb/
+#      (handles project-local install at ./.claude/kb/)
+#   3. global default: ~/.claude/kb/
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+
+if [[ -z "${KB_ROOT:-}" ]]; then
+  # walk up from SCRIPT_DIR to find project-local .claude/kb/
+  CANDIDATE="$SCRIPT_DIR"
+  KB_ROOT=""
+  while [[ "$CANDIDATE" != "/" ]]; do
+    if [[ -d "$CANDIDATE/.claude/kb" ]]; then
+      KB_ROOT="$CANDIDATE/.claude/kb"
+      break
+    fi
+    CANDIDATE="$(dirname "$CANDIDATE")"
+  done
+  if [[ -z "$KB_ROOT" ]]; then
+    KB_ROOT="$HOME/.claude/kb"
+  fi
+fi
 
 # Resolve WORKFLOW_HOME via fallback chain (v0.3.4 Windows-aware):
 #   1. POSIX symlink resolution (readlink -f)
