@@ -42,18 +42,40 @@ KB_ROOT 解析优先级（v0.3.4 — 必须按顺序尝试）：
 cmd/PowerShell 没有 `$HOME`；project-local install (`./install.sh --local`)
 下 KB 在项目目录而非 `~/.claude/kb/`。
 
-### 步骤 2：读 state + 检查队列
+### 步骤 2：bootstrap（缺失文件自动补齐）
+
+KB 目录结构首次创建（`install.sh` 后）或损坏时，**必须先 bootstrap 再读 state**：
+
+```
+KB 完整结构（bootstrap 后）：
+.kb_root/
+├── entries/                  ← mkdir -p
+├── external/
+│   └── _index.md             ← 收录清单索引（创建时就有 header）
+├── _state.md                 ← 运行时状态
+└── config.local.yaml         ← 本机 override（默认注释模板）
+```
+
+如果步骤 1 解析出 KB_ROOT 但发现**任何文件缺失**：
+1. 调 `kb-workflow bootstrap`（v0.3.4 新增，幂等——已存在的文件不重写）
+2. bootstrap 自动创建 `_state.md` / `external/_index.md` / `config.local.yaml`（用 `install.sh` 同样的模板）
+3. 重复运行安全：第二次跑会输出 "no changes needed"
+
+**禁止**：不要靠手写文件 bootstrap KB（会跟 install.sh 模板 drift）。**唯一路径**：`kb-workflow bootstrap`。
+
+### 步骤 3：读 state + 检查队列
 
 1. **Read** `$KB_ROOT/_state.md`（用步骤 1 解析的路径）
 2. 检查 `⚠️ 待裁定` / `🟡 Tentative Open` 数量
-3. 如果 `_state.md` 不存在 → 用 `doctor` 类命令诊断（v0.3.4 新增）
+3. 如果 `_state.md` 不存在 → **先 bootstrap**（回到步骤 2），然后再读
 
-### 步骤 3：启动 banner
+### 步骤 4：启动 banner
 
 ```
 ✅ KB workflow v{VERSION} loaded
    mode: active-first (no auto-store)
    kb_root: {resolved path}
+   bootstrap: ok / needed (just ran)
    entries: {N} | external: {N} | 待裁定: {N} | tentative: {N}
 ```
 

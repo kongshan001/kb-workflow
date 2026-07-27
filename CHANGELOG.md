@@ -195,6 +195,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **`kb-workflow bootstrap`** command (v0.3.4) — auto-creates missing
+  KB structure: `entries/`, `external/`, `_state.md`,
+  `external/_index.md`, `config.local.yaml`. Idempotent — re-running
+  reports "no changes needed". Fixes missing-bootstrap scenario where
+  user has empty `entries/ + external/` but no state/index/config.
+- **SKILL.md startup step 2 "bootstrap"** (v0.3.4) — explicit procedure
+  for missing-file detection: if any required file is missing, call
+  `kb-workflow bootstrap` before reading state.
+
+### Fixed
+- **SKILL.md startup hardcoded `Read ~/.claude/kb/_state.md`** —
+  startup now explicitly executes walk-up discovery (KB_ROOT env >
+  KB_HOME env > walk-up from cwd > walk-up from SKILL dir > ~/.claude/kb/)
+  before reading state. Fixes Windows-native + project-local install
+  scenarios where `~/.claude/kb/` doesn't exist.
+
+## [Unreleased]
+
+### Added
 - **`recall.py` snippet anchoring + citations + JSON output** (v0.3.4) —
   search results now include:
   - `section_anchor` — nearest preceding `## heading` (citation context)
