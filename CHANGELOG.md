@@ -194,7 +194,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
-### Added
+### Fixed
+- **6 bugs from issue #1 (Windows 部署测试报告)** (v0.4.1):
+  - **P0-①**: `install.sh make_link` cp fallback added `-rf` (was `-f`,
+    fails on dir sources like `config/`) + same-source-dest no-op +
+    `-e` instead of `-L` (MSYS ln -sf creates real dir for dirs).
+  - **P0-②**: `bin/kb-workflow status` `find ... | wc -l` and
+    `grep -l ... | wc -l` got `|| true` — pipefail + set -e was crashing
+    status when entries/ empty or any type category missing.
+  - **P1-③**: `say()` uses `printf '%s\n'` instead of `'%b\n'` — %b
+    interprets backslash escapes which corrupted Windows paths like
+    `C:\Users\admin` (`\U` → unicode escape attempt).
+  - **P1-④**: `capability-detect.sh` checks `python3` AND falls back to
+    `python` (Windows typically only exposes `python`). Network probe
+    now uses `git ls-remote` as primary (was misleading curl).
+  - **P2-⑤**: `cmd_bootstrap` heredoc unquoted so `$(date)` expands
+    (was: `<<'EOF'` literal `$()`).
+  - **P2-⑥**: `make_link` detects same-source-dest → no-op (covers
+    `--local` from repo dir case).
 - **`kb-workflow bootstrap`** command (v0.3.4) — auto-creates missing
   KB structure: `entries/`, `external/`, `_state.md`,
   `external/_index.md`, `config.local.yaml`. Idempotent — re-running

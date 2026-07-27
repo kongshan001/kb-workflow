@@ -45,17 +45,33 @@ else
   off "cc-connect" "not installed (timed review disabled; on-demand only)"
 fi
 
-# ---------- python3 ----------
+# ---------- python ----------
+# v0.4.1 (issue #1 P1-④): check both `python3` and `python` — Windows typically
+# only exposes `python` (no `python3`), old script hardcoded `python3`.
 if command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
   ok "python3" "$(python3 --version 2>&1 | head -1)"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON=python
+  ok "python"  "$(python --version 2>&1 | head -1) (Windows alias for python3)"
 else
+  PYTHON=""
   off "python3" "not installed (regen_palace.py will be skipped)"
 fi
 
 # ---------- network ----------
-if command -v curl >/dev/null 2>&1; then
+# v0.4.1 (issue #1 P1-④): use git ls-remote as primary — actual workflow
+# needs git network anyway. curl probe was misleading (could pass while
+# git was behind proxy, or vice versa).
+if command -v git >/dev/null 2>&1; then
+  if git ls-remote --heads --quiet https://github.com 2>/dev/null; then
+    ok "network" "reachable (git ls-remote)"
+  else
+    off "network" "unreachable (update check disabled)"
+  fi
+elif command -v curl >/dev/null 2>&1; then
   if curl -fsS --max-time 3 -o /dev/null https://github.com 2>/dev/null; then
-    ok "network" "reachable"
+    ok "network" "reachable (curl)"
   else
     off "network" "unreachable (update check disabled)"
   fi

@@ -29,18 +29,33 @@ fail(){ log "  ❌ $*"; exit 1; }
 
 # Try a symlink; fall back to copy if ln -sf fails (Windows Git Bash).
 # Returns 0 either way; sets SYMLINK_OK=1 if real symlink was created.
+#
+# v0.4.1 hardening (from issue #1 user testing):
+#  - same-source-dest → no-op (return 0) — covers --local from repo dir
+#  - target exists check uses -e not -L — MSYS ln creates real dir for
+#    directory sources (exit 0 but [[ -L ]] is false)
+#  - cp fallback uses -rf to handle directory sources like config/
 make_link() {
   local src="$1" dst="$2"
+  # P2-⑥: same-source-dest → already installed, no-op
+  local src_resolved dst_resolved
+  src_resolved="$(cd "$(dirname "$src")" 2>/dev/null && pwd)/$(basename "$src")"
+  dst_resolved="$(cd "$(dirname "$dst")" 2>/dev/null && pwd)/$(basename "$dst")"
+  if [[ "$src_resolved" == "$dst_resolved" ]]; then
+    SYMLINK_OK=1
+    return 0
+  fi
   if ln -sf "$src" "$dst" 2>/dev/null; then
-    # verify it really is a symlink (Windows ln may silently copy)
-    if [[ -L "$dst" ]]; then
+    # P0-①: use -e (target exists) not -L (Windows ln -sf for dirs creates
+    # real dir, exit 0, but [[ -L ]] is false → fallback to cp which fails)
+    if [[ -e "$dst" ]]; then
       SYMLINK_OK=1
       return 0
     fi
   fi
-  # fallback: plain copy
+  # P0-①: fallback copy — use -rf to handle directory sources
   if command -v cp >/dev/null 2>&1; then
-    cp -f "$src" "$dst" 2>/dev/null && SYMLINK_OK=0 && return 0
+    cp -rf "$src" "$dst" 2>/dev/null && SYMLINK_OK=0 && return 0
   fi
   return 1
 }
@@ -50,17 +65,23 @@ command -v git   >/dev/null 2>&1 || fail "git is required but not installed"
 command -v bash >/dev/null 2>&1 || fail "bash is required"
 
 # ---------- 0. parse flags + pick install scope ----------
-SCOPE=""        # "global" or "local" — empty means "ask"
+# Flag precedence:
+#   --global / --system   : explicit global install (~/.claude/kb/)
+#   --local / --project   : explicit project install (./.claude/kb/)
+#   (none) + project ctx  : default to --local (safer; project-scoped)
+#   (none) + no project   : default to --global (no project to scope to)
+# TTY always shows the prompt — never silently pollute ~/.claude/
+SCOPE=""
 UNINSTALL=0
 SOURCE_ARG=""
 CUSTOM_KB_ROOT="${KB_ROOT:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --global)  SCOPE="global"; shift ;;
-    --local|--project) SCOPE="local"; shift ;;
-    --uninstall) UNINSTALL=1; shift ;;
-    --kb-root) CUSTOM_KB_ROOT="$2"; shift 2 ;;
+    --global|--system)  SCOPE="global"; shift ;;
+    --local|--project)  SCOPE="local"; shift ;;
+    --uninstall)        UNINSTALL=1; shift ;;
+    --kb-root)          CUSTOM_KB_ROOT="$2"; shift 2 ;;
     -h|--help)
       sed -n '2,28p' "$0"; exit 0 ;;
     --*) fail "unknown flag: $1" ;;
@@ -68,27 +89,48 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# interactive scope prompt (only when no flag AND stdin is a TTY)
-if [[ -z "$SCOPE" && -t 0 ]]; then
+# Detect project context (cwd has any of these markers → assume inside a project)
+is_project_context() {
+  [[ -d ".git" ]] || [[ -f "package.json" ]] || [[ -f "pyproject.toml" ]] || \
+  [[ -f "Cargo.toml" ]] || [[ -f "go.mod" ]] || [[ -f "pom.xml" ]] || \
+  [[ -f "build.gradle" ]] || [[ -f "*.csproj" ]] || [[ -f "Gemfile" ]] || \
+  [[ -f "go.sum" ]] || [[ -f "Cargo.lock" ]]
+}
+
+# Determine default scope (only when user didn't pass a flag)
+if [[ -z "$SCOPE" ]]; then
+  if is_project_context; then
+    SCOPE="local"
+    log "  💡 detected project context (.git / package.json / pyproject.toml / etc.)"
+    log "     defaulting to --local (KB stays in project, can be gitignored)"
+  else
+    SCOPE="global"
+    log "  💡 no project markers in cwd"
+    log "     defaulting to --global (KB lives in ~/.claude/kb/)"
+  fi
+fi
+
+# TTY always shows the prompt — no silent installs to system dir
+if [[ -t 0 ]]; then
   log ""
   log "  Where should kb-workflow install?"
   log ""
-  log "    [G]  Global   — ~/.claude/skills/kb-workflow/ + ~/.claude/kb/"
-  log "             KB travels across projects (default)"
-  log ""
   log "    [L]  Local    — \${PWD}/.claude/skills/kb-workflow/ + \${PWD}/.claude/kb/"
-  log "             KB stays in this project (gitignore the .claude/kb/)"
+  log "             KB stays in this project (can be gitignored)"
+  log "             ← recommended if you have a project here"
   log ""
-  read -r -p "  Choose [G/L, default=G]: " choice
-  case "${choice,,}" in
-    l|local|project) SCOPE="local" ;;
-    *)               SCOPE="global" ;;
-  esac
-elif [[ -z "$SCOPE" ]]; then
-  # non-interactive (CI / piped): default global, warn
-  warn "non-interactive install — defaulting to --global"
-  warn "  pass --local explicitly for project-scoped install"
-  SCOPE="global"
+  log "    [G]  Global   — ~/.claude/skills/kb-workflow/ + ~/.claude/kb/"
+  log "             KB travels across all your projects"
+  log "             ← only if you want cross-project knowledge"
+  log ""
+  read -r -p "  Choose [L/G, default=L if in project, G otherwise]: " choice
+  if [[ -n "$choice" ]]; then
+    case "${choice,,}" in
+      l|local|project) SCOPE="local" ;;
+      g|global|system) SCOPE="global" ;;
+      *) warn "invalid choice '$choice' — using detected default: $SCOPE" ;;
+    esac
+  fi
 fi
 
 # ---------- compute install paths based on scope ----------

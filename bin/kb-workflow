@@ -93,7 +93,9 @@ else
   C_RESET=''; C_DIM=''; C_BOLD=''
   C_GREEN=''; C_YELLOW=''; C_RED=''; C_BLUE=''
 fi
-say()  { printf '%b\n' "$*"; }
+# v0.4.1 (issue #1 P1-③): use %s not %b — %b interprets backslash escapes
+# which corrupts Windows paths like C:\Users\admin (\U becomes unicode escape attempt)
+say()  { printf '%s\n' "$*"; }
 hdr()  { say "${C_BOLD}${C_BLUE}$*${C_RESET}"; }
 ok()   { say "  ${C_GREEN}✅${C_RESET} $*"; }
 warn() { say "  ${C_YELLOW}⚠️ ${C_RESET} $*"; }
@@ -131,17 +133,22 @@ cmd_status() {
   fi
 
   # counts (precise: parse frontmatter type: field)
+  # v0.4.1 (issue #1 P0-②): find exits 1 when target dir missing → pipefail
+  # + set -e crashes status. Add `|| true` for empty KB.
   local entries external conflicts tentative
-  entries=$(find "$KB_ROOT/entries" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ')
+  entries=$(find "$KB_ROOT/entries" -name "*.md" -type f 2>/dev/null | wc -l | tr -d ' ' || true)
   # exclude underscore-prefixed files (e.g. _index.md) from external count
-  external=$(find "$KB_ROOT/external" -name "*.md" -type f ! -name "_*" 2>/dev/null | wc -l | tr -d ' ')
+  external=$(find "$KB_ROOT/external" -name "*.md" -type f ! -name "_*" 2>/dev/null | wc -l | tr -d ' ' || true)
 
   # count entries by type (parse frontmatter "type:" field)
+  # v0.4.1 (issue #1 P0-②): grep -l exits 1 when no match → pipefail + set -e
+  # crashes status when any type category is missing. Add `|| true` so empty
+  # categories don't kill the command.
   local fact_n pref_n dec_n tent_n
-  fact_n=$(grep -l '^  type: fact' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ')
-  pref_n=$(grep -l '^  type: preference' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ')
-  dec_n=$(grep -l '^  type: decision' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ')
-  tent_n=$(grep -l '^  type: tentative' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ')
+  fact_n=$(grep -l '^  type: fact' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ' || true)
+  pref_n=$(grep -l '^  type: preference' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ' || true)
+  dec_n=$(grep -l '^  type: decision' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ' || true)
+  tent_n=$(grep -l '^  type: tentative' "$KB_ROOT/entries"/*.md 2>/dev/null | wc -l | tr -d ' ' || true)
 
   # conflicts: count "## ⚠️" + non-empty items (lines starting with "- " inside ⚠️ section)
   if [[ -f "$KB_ROOT/_state.md" ]]; then
@@ -266,7 +273,8 @@ cmd_bootstrap() {
 
   # _state.md
   if [[ ! -f "$KB_STATE_FILE" ]]; then
-    cat > "$KB_STATE_FILE" <<'EOF'
+    # v0.4.1 (issue #1 P2-⑤): unquoted heredoc so $(date) expands
+    cat > "$KB_STATE_FILE" <<EOF
 # KB Runtime State
 
 > Assistant-owned. Harness 不读此文件，每次会话开场由 assistant 主动 Read 一次。
@@ -300,10 +308,10 @@ EOF
 
   # external/_index.md
   if [[ ! -f "$KB_INDEX_FILE" ]]; then
-    cat > "$KB_INDEX_FILE" <<'EOF'
+    cat > "$KB_INDEX_FILE" <<EOF
 # External Articles Index
 
-> 自动维护。每次 `/kb-save-article` 后由 assistant 追加一行。
+> 自动维护。每次 \`/kb-save-article\` 后由 assistant 追加一行。
 
 | ingested | topic | slug | source_url |
 |---|---|---|---|
