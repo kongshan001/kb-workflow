@@ -18,8 +18,21 @@ topics:
     label: 基础设施 / 部署
     palace_room: kb_external/infra
   - id: ml
-    label: 机器学习
+    label: 机器学习（通用 ML / 数据模型框架）
     palace_room: kb_external/ml
+  # v0.3.3 新增：LLM 应用细分主题（D10 evolution，awesome-llm-apps 触发）
+  - id: llm-agent
+    label: LLM Agent 应用 / 框架 / 工具
+    palace_room: kb_external/llm-agent
+  - id: llm-memory
+    label: LLM 长期记忆 / 知识图谱 / 向量派 memory
+    palace_room: kb_external/llm-memory
+  - id: llm-voice
+    label: LLM 语音 / 实时流式
+    palace_room: kb_external/llm-voice
+  - id: llm-rag
+    label: LLM RAG 变体 / tutorial / 应用集合
+    palace_room: kb_external/llm-rag
   - id: lang-zh
     label: 中文相关
     palace_room: kb_external/lang-zh

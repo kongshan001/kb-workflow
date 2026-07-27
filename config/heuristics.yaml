@@ -1,6 +1,14 @@
 # Heuristic rules for auto-classification
 # v0.2.0: only used when user explicitly invokes /kb-capture
 # Auto-classification is NO LONGER run on every user input
+#
+# v0.3.0 fix: removed `explicit_fact` URL rule (priority 80).
+# URLs are now routed by SKILL.md D1 → /kb-save-article flow BEFORE
+# reaching /kb-capture heuristics. See config/defaults.yaml url_pattern
+# and SKILL.md D9 for the URL capture pipeline.
+# If a URL ever slips through to /kb-capture (e.g. via /kb-capture-force
+# with a URL string), it will fall through to `default` rule below
+# (priority 0, type=fact) — which is the safe fallback.
 
 rules:
   - priority: 100
@@ -24,11 +32,8 @@ rules:
     type: tentative
     pattern: "\\b(想试试|考虑|也许|或许|先放着|可以试试)\\b"
 
-  - priority: 80
-    name: explicit_fact
-    type: fact
-    pattern: "^(https?://|www\\.)"
-    note: 短 URL 默认归 fact；如要保存原文用 /kb-save-article
+  # REMOVED in v0.3.0: priority 80 explicit_fact URL rule.
+  # URL routing is now handled upstream by D1 (see comment block above).
 
   - priority: 70
     name: past_tense_fact

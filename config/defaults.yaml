@@ -164,11 +164,21 @@ review:
 # ---------- external article (v0.2.0) ----------
 external:
   schema: external_article
-  filename_pattern: "YYYY-MM-DD_<topic>_<slug>.md"
+  # v0.3.1: 接受 `_` 或 `-` 作为分隔符（既有 KB 两种都用；`_` 为新约定推荐）
+  filename_pattern: "YYYY-MM-DD[-_]<topic>[-_]<slug>.md"
   index_file: "_index.md"
   default_topic: uncategorized
   auto_mirror_palace: true
   palace_wing: kb_external
+  # v0.3.0: 强制 _index.md 同步规则（修复"漏写索引"反模式）
+  index_sync:
+    on_write: append                 # 写新条目后追加一行（assistant 必做）
+    on_update: replace_row           # 同 slug 行替换（bump last_seen）
+    on_delete: remove_row            # 删除条目同步移除
+    columns: [ingested, topic, slug, source_url]
+    # 防 drift：assistant 在 kb-status / 每周日 review 时校验 _index.md 行数
+    # 与 external/ 实际文件数是否一致（排除 _index.md 自身）
+    drift_check: weekly
 
 # ---------- recall (D8) ----------
 recall:
@@ -183,6 +193,19 @@ ticket:
   conflict: "⚠️  CONFLICT with <other_slug>: <reason>"
   refine:   "🔗 REFINES <parent_slug>: <delta>"
   update:   "✏️  UPDATES <old_slug>: <change>"
+  # v0.3.0: external 条目专用票据标记
+  external_new:     "📥 /kb-save-article → external/<filename>  topic=<topic>  sha=<short_sha>"
+  external_dedup:   "🔁 /kb-save-article → DEDUP  external/<filename>  (same URL + SHA)"
+  external_update:  "✏️  /kb-save-article → UPDATE  external/<filename>  (sha <old> → <new>)"
+  external_supersede: "⤴  /kb-save-article → SUPERSEDES  external/<new_filename>  ← external/<old_filename>"
+  external_remove:  "✗  /kb-save-article → REMOVED  external/<filename>"
+  # _state.md "最近 10 条" 标记（v0.3.0 引入，替代现场发明）
+  state_marker:
+    new:       "+"     # 新建
+    update:    "↻"     # 内容更新（bump last_seen, content_sha 变）
+    dedup:     "·"     # dedup skip（仅记录，不新增条目）
+    supersede: "⤴"     # supersede 旧条目
+    remove:    "✗"     # 删除 / 废弃
 
 # ---------- semantic search (palace) ----------
 palace:

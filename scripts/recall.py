@@ -10,6 +10,9 @@ Modes:
   --mode embed  semantic via ollama
 
 Output: JSON with hits [{file, name, type, snippet, score}]
+
+v0.3.3: uses shared frontmatter.py (yaml.safe_load if available, else
+handrolled fallback). Replaces inline parse_frontmatter.
 """
 
 import argparse
@@ -21,51 +24,12 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from frontmatter import parse_string as parse_frontmatter, backend as fm_backend
+
 KB_ROOT = Path(os.environ.get("KB_ROOT", Path.home() / ".claude" / "kb"))
 ENTRIES_DIR = KB_ROOT / "entries"
 EXTERNAL_DIR = KB_ROOT / "external"
-
-
-def parse_frontmatter(content: str):
-    if not content.startswith("---"):
-        return {}, content
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        return {}, content
-    fm_text, body = parts[1].strip(), parts[2].lstrip("\n")
-    meta = {}
-    current_parent = None
-    current_list_key = None
-    for line in fm_text.splitlines():
-        if not line.strip():
-            continue
-        m_list = re.match(r"^\s+-\s+(.*)$", line)
-        if m_list and current_list_key is not None:
-            meta[current_list_key].append(m_list.group(1).strip())
-            continue
-        m_nested = re.match(r"^\s+(\w+):\s*(.*)$", line)
-        if m_nested and current_parent is not None:
-            key, val = m_nested.group(1), m_nested.group(2)
-            if val == "":
-                meta[key] = []
-                current_list_key = key
-                current_parent = None
-            else:
-                meta[key] = val.strip().strip('"').strip("'")
-                current_list_key = None
-            continue
-        m_top = re.match(r"^(\w+):\s*(.*)$", line)
-        if m_top:
-            key, val = m_top.group(1), m_top.group(2)
-            if val == "":
-                meta[key] = {}
-                current_parent = key
-                current_list_key = None
-            else:
-                meta[key] = val.strip().strip('"').strip("'")
-                current_parent = None
-                current_list_key = None
-    return meta, body
 
 
 def collect_files():
@@ -144,6 +108,15 @@ def cosine(a, b):
     return dot / (na * nb)
 
 
+def get_topic(meta: dict) -> str:
+    """Extract topic from frontmatter. Handles nested metadata.topic (external_article)."""
+    if "topic" in meta:
+        return meta["topic"]
+    if "metadata" in meta and isinstance(meta["metadata"], dict):
+        return meta["metadata"].get("topic", "")
+    return ""
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("query", help="search query")
@@ -151,6 +124,7 @@ def main():
     p.add_argument("--model", default="nomic-embed-text")
     p.add_argument("--limit", type=int, default=5)
     p.add_argument("--kb-root", type=Path, default=None)
+    p.add_argument("--topic", default=None, help="v0.3.3: filter by topic (e.g. llm-memory, rag, ml)")
     args = p.parse_args()
 
     global KB_ROOT, ENTRIES_DIR, EXTERNAL_DIR
@@ -163,6 +137,26 @@ def main():
     if not files:
         print("  ℹ️  no KB files to search")
         return 0
+
+    # v0.3.3: topic filter — preload frontmatter for all files
+    topic_filtered = False
+    if args.topic:
+        topic_filtered = True
+        filtered = []
+        for f in files:
+            content = f.read_text(encoding="utf-8", errors="ignore")
+            meta, _ = parse_frontmatter(content)
+            t = get_topic(meta)
+            if t == args.topic:
+                filtered.append(f)
+            elif t == "" and f.parent.name == "entries":
+                # entries/ items have no topic field — exclude when --topic is set
+                pass
+            # else: skip (topic mismatch)
+        files = filtered
+        if not files:
+            print(f"  ℹ️  no files match topic={args.topic!r}")
+            return 0
 
     hits = []
     if args.mode == "embed":
@@ -210,7 +204,8 @@ def main():
         print(f"  ℹ️  no matches for: {args.query}")
         return 0
 
-    print(f"  🔍 {len(hits)} hit(s) for: {args.query}\n")
+    filter_label = f" [topic={args.topic}]" if topic_filtered else ""
+    print(f"  🔍 {len(hits)} hit(s) for: {args.query}{filter_label}\n")
     for i, h in enumerate(hits, 1):
         print(f"─── {i}. [{h['type']}] {h['name']} (score {h['score']:.2f}) ───")
         print(f"  {h['description']}")

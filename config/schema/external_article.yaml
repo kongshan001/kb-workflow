@@ -2,6 +2,7 @@
 # 适用：原始资料（URL 指向的文章、贴的整篇文档、会议记录等）
 # 路径：external/YYYY-MM-DD_<topic>_<slug>.md
 # 触发：/kb-save-article（v0.2.0 主路径）
+# v0.3.0: 加 last_seen 字段（D5 dedup bump 落点）+ content_sha 字段（D5 精确判等）
 
 name: <YYYY-MM-DD>-<topic>-<slug>
 description: <一句话摘要>
@@ -9,7 +10,9 @@ metadata:
   type: external_article
   source_url: <URL | "user-pasted">
   ingested_at: <YYYY-MM-DD>
+  last_seen: <YYYY-MM-DD>            # v0.3.0 新增：D5 dedup bump 时更新；旧条目可补 null
   topic: <topic>
+  content_sha: <git blob SHA | null> # v0.3.0 新增：源码/内容精确指纹（如 README SHA）；D5 比对用
   key_points:
     - <要点 1>
     - <要点 2>

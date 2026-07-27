@@ -18,50 +18,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from frontmatter import parse_string as _parse_frontmatter
+
 KB_ROOT = Path(os.environ.get("KB_ROOT", Path.home() / ".claude" / "kb"))
 ENTRIES_DIR = KB_ROOT / "entries"
 
 
 def parse_frontmatter(content: str):
-    if not content.startswith("---"):
-        return {}, content
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        return {}, content
-    fm_text, body = parts[1].strip(), parts[2].lstrip("\n")
-    meta = {}
-    current_parent = None
-    current_list_key = None
-    for line in fm_text.splitlines():
-        if not line.strip():
-            continue
-        m_list = re.match(r"^\s+-\s+(.*)$", line)
-        if m_list and current_list_key is not None:
-            meta[current_list_key].append(m_list.group(1).strip())
-            continue
-        m_nested = re.match(r"^\s+(\w+):\s*(.*)$", line)
-        if m_nested and current_parent is not None:
-            key, val = m_nested.group(1), m_nested.group(2)
-            if val == "":
-                meta[key] = []
-                current_list_key = key
-                current_parent = None
-            else:
-                meta[key] = val.strip().strip('"').strip("'")
-                current_list_key = None
-            continue
-        m_top = re.match(r"^(\w+):\s*(.*)$", line)
-        if m_top:
-            key, val = m_top.group(1), m_top.group(2)
-            if val == "":
-                meta[key] = {}
-                current_parent = key
-                current_list_key = None
-            else:
-                meta[key] = val.strip().strip('"').strip("'")
-                current_parent = None
-                current_list_key = None
-    return meta, body
+    # v0.3.3: delegate to shared frontmatter.py (yaml.safe_load if available)
+    from frontmatter import parse_string
+    return parse_string(content)
 
 
 def load_entries():
