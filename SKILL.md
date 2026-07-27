@@ -66,6 +66,43 @@ description: KB 收录与管理工作流（active-first）。Use when user invok
 
 ## D2 存储布局
 
+### 平台考量（v0.3.4）
+
+kb-workflow 在三种 shell 环境下行为不同——**先 `kb-workflow doctor` 看你的环境**：
+
+| 环境 | `$HOME` | 默认 KB 位置 | 备注 |
+|---|---|---|---|
+| **macOS / Linux** (bash/zsh) | `/Users/<user>` | `~/.claude/kb/` | 一切正常 |
+| **Git Bash on Windows** (MINGW/MSYS) | 自动映射到 `C:\Users\<user>\` | `~/.claude/kb/` → `C:\Users\<user>\.claude\kb\` | **⚠️ OneDrive 同步可能冲突** |
+| **Windows-native cmd/PowerShell** | 通常无 `$HOME` | 需显式 `KB_ROOT` env | 不用 Git Bash 的场景 |
+| **WSL** (Windows Subsystem for Linux) | Linux path (`/home/<user>`) | `~/.claude/kb/` 在 WSL 侧 | 与 Windows host 的 `C:\Users\<user>\` **完全分离** |
+
+### ⚠️ OneDrive / 云同步陷阱
+
+如果 Windows 用户的 `C:\Users\<user>\Documents\` 被 OneDrive 接管并自动同步到云端：
+- **KB 内容可能上传到云**——包含个人偏好、决策、未公开项目信息
+- **冲突合并会损坏 KB**——OneDrive 同步多端修改会产生 `_state.md (1).conflict-yyyy-mm-dd` 副本
+- **修复方案**：`KB_ROOT=C:/kb-data`（推荐路径：`C:/kb-data` 或 `D:/kb-data`，不在 OneDrive 同步目录下）
+
+### Config root 范式（v0.3.4，XDG-style）
+
+```
+KB_HOME   — single config root，所有路径派生自此（除非各自 env override）
+KB_ROOT   — KB data dir override
+KB_STATE_FILE / KB_CONFIG_FILE / KB_INDEX_FILE — 细粒度 override
+KB_WORKFLOW_HOME — skill source dir override
+
+# 例子（OneDrive-aware）：
+$ export KB_HOME=C:/kb-data
+$ kb-workflow doctor
+# 确认所有路径在 C:/kb-data/ 下，不会被 OneDrive 同步
+```
+
+优先级：per-path env > KB_HOME > walk-up discovery > $HOME/.claude/kb/
+
+
+## D2 存储布局
+
 ```
 ~/.claude/kb/
 ├── _state.md                  # 运行时状态（assistant 维护）

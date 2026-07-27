@@ -9,41 +9,40 @@
 
 set -euo pipefail
 
-# ---------- resolve KB_ROOT + workflow home ----------
-# v0.3.4: All paths overridable via env vars (Windows / sandboxed / multi-KB use cases).
+# ---------- resolve KB paths (XDG-style single-root + per-path overrides) ----------
+# v0.3.4 (single-root pattern, inspired by XDG_DATA_HOME / CARGO_HOME / Obsidian vault):
 #
-# Env vars (highest priority):
-#   KB_ROOT               — KB data dir (entries/, external/, _state.md)
-#   KB_WORKFLOW_HOME      — skill source dir (where SKILL.md lives)
-#   KB_STATE_FILE         — override _state.md path
-#   KB_CONFIG_FILE        — override config.local.yaml path
-#   KB_INDEX_FILE         — override external/_index.md path
-#   KB_SKILL_DIR          — override skill install dir (for status banner)
-#   KB_CLI_DIR            — override CLI install dir (for status banner)
+# KB_HOME   — single config root (all paths derive from it unless individually overridden)
+# KB_ROOT   — KB data dir override (entries/, external/, _state.md)
+# KB_STATE_FILE / KB_CONFIG_FILE / KB_INDEX_FILE — fine-grained overrides
+# KB_WORKFLOW_HOME — skill source dir (where SKILL.md lives)
 #
-# Resolution chain (when env not set):
-#   1. KB_ROOT env (always wins)
-#   2. walk-up from SCRIPT_DIR looking for .claude/kb/
-#   3. project-local fallback: <cwd>/.claude/kb/
+# Resolution chain:
+#   1. per-path env var (KB_ROOT, KB_STATE_FILE, etc.) — always wins
+#   2. KB_HOME (single-root) + relative path
+#   3. walk-up from SCRIPT_DIR looking for .claude/kb/
 #   4. global default: $HOME/.claude/kb/
 #
-# (config.local.yaml paths: block is parsed by scripts/recall.py and
-# scripts/forget.py — see defaults.yaml `paths:` section.)
+# Run `kb-workflow doctor` to see resolved paths for debugging.
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 
 if [[ -z "${KB_ROOT:-}" ]]; then
-  CANDIDATE="$SCRIPT_DIR"
-  KB_ROOT=""
-  while [[ "$CANDIDATE" != "/" ]]; do
-    if [[ -d "$CANDIDATE/.claude/kb" ]]; then
-      KB_ROOT="$CANDIDATE/.claude/kb"
-      break
+  if [[ -n "${KB_HOME:-}" ]]; then
+    KB_ROOT="$KB_HOME"
+  else
+    CANDIDATE="$SCRIPT_DIR"
+    KB_ROOT=""
+    while [[ "$CANDIDATE" != "/" && "$CANDIDATE" != "" ]]; do
+      if [[ -d "$CANDIDATE/.claude/kb" ]]; then
+        KB_ROOT="$CANDIDATE/.claude/kb"
+        break
+      fi
+      CANDIDATE="$(dirname "$CANDIDATE")"
+    done
+    if [[ -z "$KB_ROOT" ]]; then
+      KB_ROOT="$HOME/.claude/kb"
     fi
-    CANDIDATE="$(dirname "$CANDIDATE")"
-  done
-  if [[ -z "$KB_ROOT" ]]; then
-    KB_ROOT="$HOME/.claude/kb"
   fi
 fi
 
@@ -51,7 +50,7 @@ fi
 KB_STATE_FILE="${KB_STATE_FILE:-$KB_ROOT/_state.md}"
 KB_CONFIG_FILE="${KB_CONFIG_FILE:-$KB_ROOT/config.local.yaml}"
 KB_INDEX_FILE="${KB_INDEX_FILE:-$KB_ROOT/external/_index.md}"
-export KB_STATE_FILE KB_CONFIG_FILE KB_INDEX_FILE
+export KB_STATE_FILE KB_CONFIG_FILE KB_INDEX_FILE KB_ROOT KB_HOME
 
 # Resolve WORKFLOW_HOME via fallback chain (v0.3.4 Windows-aware):
 #   1. POSIX symlink resolution (readlink -f)
@@ -252,12 +251,89 @@ cmd_version() {
   say "kb-workflow v${VERSION}"
 }
 
+cmd_doctor() {
+  hdr "🩺 kb-workflow doctor (diagnose paths + health)"
+
+  say ""
+  say "  ${C_BOLD}Platform${C_RESET}"
+  say "    uname:      $(uname -s 2>/dev/null || echo '?')"
+  say "    \$HOME:      ${HOME:-<unset>}"
+  if [[ "$(uname -s 2>/dev/null)" =~ MINGW|MSYS|CYGWIN ]]; then
+    say "    \$USERPROFILE: ${USERPROFILE:-<unset>}"
+    say "    mode:       Windows (Git Bash)"
+  fi
+
+  say ""
+  say "  ${C_BOLD}Resolved paths${C_RESET} (env overrides shown)"
+  if [[ -n "${KB_HOME:-}" ]]; then
+    say "    KB_HOME (single-root): ${C_GREEN}$KB_HOME${C_RESET}  ${C_DIM}← env${C_RESET}"
+  fi
+  if [[ -n "${KB_ROOT:-}" ]]; then
+    say "    KB_ROOT (override):   ${C_GREEN}$KB_ROOT${C_RESET}  ${C_DIM}← env${C_RESET}"
+  else
+    say "    KB_ROOT (auto-detect): ${C_GREEN}$KB_ROOT${C_RESET}"
+  fi
+  if [[ -n "${KB_STATE_FILE:-}" ]]; then
+    say "    KB_STATE_FILE:        ${C_GREEN}$KB_STATE_FILE${C_RESET}  ${C_DIM}← env${C_RESET}"
+  else
+    say "    KB_STATE_FILE:        ${C_GREEN}$KB_STATE_FILE${C_RESET}  ${C_DIM}(derived from KB_ROOT)${C_RESET}"
+  fi
+  if [[ -n "${KB_CONFIG_FILE:-}" ]]; then
+    say "    KB_CONFIG_FILE:       ${C_GREEN}$KB_CONFIG_FILE${C_RESET}  ${C_DIM}← env${C_RESET}"
+  else
+    say "    KB_CONFIG_FILE:       ${C_GREEN}$KB_CONFIG_FILE${C_RESET}  ${C_DIM}(derived)${C_RESET}"
+  fi
+  if [[ -n "${KB_INDEX_FILE:-}" ]]; then
+    say "    KB_INDEX_FILE:        ${C_GREEN}$KB_INDEX_FILE${C_RESET}  ${C_DIM}← env${C_RESET}"
+  else
+    say "    KB_INDEX_FILE:        ${C_GREEN}$KB_INDEX_FILE${C_RESET}  ${C_DIM}(derived)${C_RESET}"
+  fi
+  if [[ -n "${KB_WORKFLOW_HOME:-}" ]]; then
+    say "    KB_WORKFLOW_HOME:     ${C_GREEN}$KB_WORKFLOW_HOME${C_RESET}  ${C_DIM}← env${C_RESET}"
+  else
+    say "    KB_WORKFLOW_HOME:     ${C_GREEN}$WORKFLOW_HOME${C_RESET}  ${C_DIM}(from .installed_source / readlink)${C_RESET}"
+  fi
+
+  say ""
+  say "  ${C_BOLD}Health checks${C_RESET}"
+  local issues=0
+  for p in "$KB_ROOT" "$KB_ROOT/entries" "$KB_ROOT/external"; do
+    if [[ -d "$p" && -w "$p" ]]; then
+      say "    ${C_GREEN}✓${C_RESET} $p (writable)"
+    elif [[ -d "$p" ]]; then
+      say "    ${C_RED}✗${C_RESET} $p (exists but NOT writable)"
+      issues=$((issues+1))
+    else
+      say "    ${C_RED}✗${C_RESET} $p (missing)"
+      issues=$((issues+1))
+    fi
+  done
+  for p in "$KB_STATE_FILE" "$KB_CONFIG_FILE" "$KB_INDEX_FILE"; do
+    if [[ -f "$p" ]]; then
+      say "    ${C_GREEN}✓${C_RESET} $p"
+    else
+      say "    ${C_YELLOW}○${C_RESET} $p (will be created on first use)"
+    fi
+  done
+
+  say ""
+  if [[ $issues -gt 0 ]]; then
+    say "  ${C_RED}$issues issue(s) found${C_RESET}"
+    say "  ${C_DIM}Hint: try KB_ROOT=/some/writable/path or fix permissions${C_RESET}"
+    return 1
+  else
+    say "  ${C_GREEN}all paths writable${C_RESET}"
+    return 0
+  fi
+}
+
 # ---------- dispatch ----------
 case "${1:-help}" in
   status)    shift; cmd_status "$@" ;;
   update)    shift; cmd_update "$@" ;;
   uninstall) shift; cmd_uninstall "$@" ;;
   install)   shift; cmd_install "$@" ;;
+  doctor)    shift; cmd_doctor "$@" ;;
   version|-v|--version) cmd_version ;;
   help|-h|--help|"") usage ;;
   *) err "unknown command: $1"; usage; exit 1 ;;

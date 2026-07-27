@@ -195,6 +195,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Added
+- **`KB_HOME` single-root env var** (v0.3.4, XDG-style) — all KB paths
+  derive from `KB_HOME` unless individually overridden (CARGO_HOME / XDG_DATA_HOME
+  / Obsidian vault pattern). Priority chain: per-path env > KB_HOME > walk-up
+  discovery > `$HOME/.claude/kb/`.
+- **`kb-workflow doctor`** command (v0.3.4) — diagnostic helper that prints:
+  - Platform info (uname, $HOME, $USERPROFILE on Windows)
+  - Resolved paths for all KB env vars (with `← env` annotation for overrides)
+  - Health checks (writable? missing? for each path)
+  - Hint when issues found
+- **SKILL.md "平台考量" section** (v0.3.4) — table comparing macOS / Linux /
+  Git Bash on Windows / Windows-native / WSL environments + OneDrive sync
+  pitfall warning + KB_HOME usage example.
+
+### Tested
+- `kb-workflow doctor` (no env): all 6 paths detected + writable ✓
+- `KB_HOME=/tmp/kb-test kb-workflow doctor`: single-root override works ✓
+
+## [Unreleased]
+
+### Added
 - **`install.sh --local / --global`** (v0.3.4) — explicit install scope:
   - `--global` (default): install to `~/.claude/skills/`, `~/.local/bin/`, `~/.claude/kb/` (KB travels across projects)
   - `--local` / `--project`: install to `./.claude/skills/`, `./bin/`, `./.claude/kb/` (project-scoped, can be gitignored)
