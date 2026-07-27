@@ -46,7 +46,13 @@ def first_paragraph(body: str) -> str:
 
 
 def build_payload(meta: dict, body: str, file_path: Path) -> dict:
-    topic = meta.get("topic", "uncategorized")
+    # v0.3.4: external_article schema uses nested metadata.topic.
+    # Fall back to top-level topic for legacy entries.
+    topic = meta.get("topic")
+    if not topic and isinstance(meta.get("metadata"), dict):
+        topic = meta["metadata"].get("topic")
+    if not topic:
+        topic = "uncategorized"
     if isinstance(topic, str) and "," in topic:
         topics = [t.strip() for t in topic.split(",")]
     else:
