@@ -194,6 +194,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Fixed
+- **Windows symlink fallback** (v0.3.4, D10 evolution from user critique) —
+  Git Bash on Windows doesn't always support `ln -sf` (silently falls back
+  to file copy), breaking `readlink -f` in `bin/kb-workflow` and causing
+  `WORKFLOW_HOME` to resolve wrong. Fix:
+  1. `bin/kb-workflow` — 3-step WORKFLOW_HOME resolution: readlink →
+     `.installed_source` file → heuristic (../ from script dir)
+  2. `install.sh` — `make_link()` helper tries `ln -sf`, verifies result
+     is real symlink, falls back to `cp -f`
+  3. `install.sh` — writes `.installed_source` next to CLI binary
+     (contains absolute path to skill root)
+  4. `install.sh` — early Windows detection (MINGW/MSYS/CYGWIN)
+     prints upfront warning
+  - Tested via `/tmp/win-test` simulation: `cp` + `.installed_source` →
+    `kb-workflow status` correctly resolves workflow path.
+
 ## [0.2.1] - 2026-07-25
 
 ### Added
