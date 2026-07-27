@@ -194,6 +194,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
+### Added
+- **`install.sh --local / --global`** (v0.3.4) — explicit install scope:
+  - `--global` (default): install to `~/.claude/skills/`, `~/.local/bin/`, `~/.claude/kb/` (KB travels across projects)
+  - `--local` / `--project`: install to `./.claude/skills/`, `./bin/`, `./.claude/kb/` (project-scoped, can be gitignored)
+  - `--kb-root PATH`: override KB_ROOT (works in either scope)
+  - `--uninstall`: symmetric cleanup (KB kept by default)
+  - Interactive prompt when no flag + TTY: `[G/L, default=G]`
+- **`bin/kb-workflow` KB_ROOT auto-detection** (v0.3.4) — 3-step:
+  1. KB_ROOT env var (always wins)
+  2. walk up from SCRIPT_DIR looking for `.claude/kb/` (project-local)
+  3. fallback to `~/.claude/kb/` (global)
+- Tested: project-local install → `status` correctly resolves to `./.claude/kb/`
+
 ### Fixed
 - **Windows symlink fallback** (v0.3.4, D10 evolution from user critique) —
   Git Bash on Windows doesn't always support `ln -sf` (silently falls back
