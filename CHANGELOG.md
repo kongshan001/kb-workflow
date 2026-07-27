@@ -195,6 +195,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ## [Unreleased]
 
 ### Fixed
+- **install.sh default scope** (v0.4.3) — user reported "default still
+  installs to global even when in project dir". Two real issues:
+  1. `*.csproj` glob never matched (`-f` doesn't expand globs in bash)
+  2. Default philosophy was too eager to choose --global when
+     no project markers detected
+  Fix:
+  - `is_project_context()` rewritten with `shopt -s nullglob` + explicit
+    for-loop for all extensions; added coverage for `requirements.txt`,
+    `composer.json`, `pubspec.yaml`, `Package.swift`, `mix.exs`,
+    `Project.toml`, `flake.nix`, `*.csproj`, `*.sln`, `build.gradle.kts`,
+    plus VCS dirs `.hg` / `.svn`
+  - Default philosophy flipped to "safer = local":
+    * cwd has project markers → local
+    * cwd is $HOME → global (clearly cross-project intent)
+    * cwd is somewhere else, no markers → local (safer than polluting $HOME)
+
+### Fixed
 - **P1-④ retry: capability-detect network probe** (v0.4.2) — probed
   `https://github.com` (root domain, not a git repo) → `ls-remote`
   always failed with "repository not found" regardless of network state.

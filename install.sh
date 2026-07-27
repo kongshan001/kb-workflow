@@ -89,24 +89,43 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Detect project context (cwd has any of these markers → assume inside a project)
+# Detect project context (cwd has any of these markers → assume inside a project).
+# v0.4.3: globbing patterns use shopt nullglob + for-loop (was: bare -f "*.csproj"
+# never matches because -f doesn't expand globs).
 is_project_context() {
-  [[ -d ".git" ]] || [[ -f "package.json" ]] || [[ -f "pyproject.toml" ]] || \
-  [[ -f "Cargo.toml" ]] || [[ -f "go.mod" ]] || [[ -f "pom.xml" ]] || \
-  [[ -f "build.gradle" ]] || [[ -f "*.csproj" ]] || [[ -f "Gemfile" ]] || \
-  [[ -f "go.sum" ]] || [[ -f "Cargo.lock" ]]
+  shopt -s nullglob
+  local f
+  [[ -d ".git" ]] && return 0
+  [[ -d ".hg" ]]  && return 0
+  [[ -d ".svn" ]] && return 0
+  for f in \
+      package.json pyproject.toml setup.py setup.cfg requirements.txt \
+      Cargo.toml go.mod go.sum pom.xml build.gradle build.gradle.kts \
+      Gemfile Rakefile composer.json pubspec.yaml Package.swift \
+      mix.exs Project.toml flake.nix; do
+    [[ -f "$f" ]] && return 0
+  done
+  for f in *.csproj *.sln; do
+    [[ -f "$f" ]] && return 0
+  done
+  return 1
 }
 
-# Determine default scope (only when user didn't pass a flag)
+# v0.4.3: default to --local (safe — never pollutes system KB).
+# Only suggest --global if user is sitting at $HOME (no project context
+# AND cwd is roughly their home directory — clearly wants cross-project).
 if [[ -z "$SCOPE" ]]; then
   if is_project_context; then
     SCOPE="local"
-    log "  💡 detected project context (.git / package.json / pyproject.toml / etc.)"
-    log "     defaulting to --local (KB stays in project, can be gitignored)"
-  else
+    log "  💡 detected project context → defaulting to --local"
+  elif [[ "$(cd ~ 2>/dev/null && pwd)" == "$(pwd)" ]]; then
+    # cwd IS user's $HOME → they're at the top level, want cross-project
     SCOPE="global"
-    log "  💡 no project markers in cwd"
-    log "     defaulting to --global (KB lives in ~/.claude/kb/)"
+    log "  💡 cwd is \$HOME with no project markers → defaulting to --global"
+  else
+    # cwd is somewhere else but no project markers → safer to default local
+    SCOPE="local"
+    log "  💡 no project markers in cwd → defaulting to --local (safer than polluting \$HOME)"
   fi
 fi
 
@@ -123,7 +142,7 @@ if [[ -t 0 ]]; then
   log "             KB travels across all your projects"
   log "             ← only if you want cross-project knowledge"
   log ""
-  read -r -p "  Choose [L/G, default=L if in project, G otherwise]: " choice
+  read -r -p "  Choose [L/G, default=L]: " choice
   if [[ -n "$choice" ]]; then
     case "${choice,,}" in
       l|local|project) SCOPE="local" ;;
