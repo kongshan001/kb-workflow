@@ -3,7 +3,7 @@
 All notable changes to kb-workflow are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
-## [Unreleased]
+## [0.3.3] - 2026-07-27
 
 ### Added
 - **LLM 应用细分 topics** (v0.3.3, D10 evolution from awesome-llm-apps capture)
@@ -179,6 +179,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   checks pass (index / schema / sections / changelog).
 - **kb-evolve D11** demonstrated end-to-end: slash command → drift_check.py →
   real drift detected → defaults.yaml relaxed → re-run clean.
+
+### Added (post-tag cleanup, v0.3.3 + v0.3.4)
+- **`scripts/frontmatter.py`** — shared frontmatter parser (yaml.safe_load + handrolled fallback). PyYAML 6.0.3 installed via `--trusted-host` to bypass PEP 668 SSL.
+- **`scripts/forget.py`** — D12 soft/hard delete + restore.
+- **`scripts/drift_check.py`** — 4-check consistency auditor (D11).
+- **`recall.py --topic`** — structured topic filter.
+- **Minimal Entry Mode** — frontmatter 5-field minimal mode for awesome-lists.
+- **Version sync** — bin/kb-workflow VERSION 0.2.2-dev → 0.3.3-dev.
+- **Topic taxonomy** — added llm-agent / llm-memory / llm-voice / llm-rag sub-topics.
+
+### Fixed
+- **cognee description unquoted CJK + ':'** caused PyYAML `mapping values are not allowed here` error; now quoted. 0 PyYAML warnings across 7 entries.
+
+## [Unreleased]
 
 ## [0.2.1] - 2026-07-25
 
