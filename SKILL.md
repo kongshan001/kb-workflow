@@ -19,14 +19,45 @@ description: KB 收录与管理工作流（active-first）。Use when user invok
 ## 启动流程
 
 每个会话开场：
-1. **Read** `~/.claude/kb/_state.md`（运行时状态 + 队列 + 统计）
+
+### 步骤 1：发现 KB 位置（**关键 — 不能跳过**）
+
+D2 写了 walk-up discovery 优先级，但**启动流程必须真的执行**：
+
+```
+KB_ROOT 解析优先级（v0.3.4 — 必须按顺序尝试）：
+1. KB_ROOT env var               ← 最高优先级（user 显式 override）
+2. KB_HOME env var (single-root)  ← XDG-style 单一根
+3. walk-up from cwd: 从 ${CWD} 往上找 .claude/kb/
+   - 例：cwd = g:\project\kb-workflow-demo
+     → g:\project\kb-workflow-demo\.claude\kb  ← 命中
+   - 一直 walk-up 到 / 或 盘符根
+4. walk-up from SKILL install dir: ~/.claude/skills/kb-workflow/
+5. $HOME/.claude/kb/              ← 全局默认（POSIX）
+   Windows-native: C:\Users\<user>\.claude\kb\
+   WSL: /home/<user>/.claude/kb/  (与 Windows host 隔离)
+```
+
+**禁止**：直接 Read `~/.claude/kb/_state.md`（硬编码路径）。Windows-native
+cmd/PowerShell 没有 `$HOME`；project-local install (`./install.sh --local`)
+下 KB 在项目目录而非 `~/.claude/kb/`。
+
+### 步骤 2：读 state + 检查队列
+
+1. **Read** `$KB_ROOT/_state.md`（用步骤 1 解析的路径）
 2. 检查 `⚠️ 待裁定` / `🟡 Tentative Open` 数量
-3. 启动 banner 打印一次：
-   ```
-   ✅ KB workflow v0.2.0 loaded
-      mode: active-first (no auto-store)
-      entries: {N} | external: {N} | 待裁定: {N} | tentative: {N}
-   ```
+3. 如果 `_state.md` 不存在 → 用 `doctor` 类命令诊断（v0.3.4 新增）
+
+### 步骤 3：启动 banner
+
+```
+✅ KB workflow v{VERSION} loaded
+   mode: active-first (no auto-store)
+   kb_root: {resolved path}
+   entries: {N} | external: {N} | 待裁定: {N} | tentative: {N}
+```
+
+`VERSION` 从软链目标的 `bin/kb-workflow VERSION=` 字符串读取。
 
 ---
 
