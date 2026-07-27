@@ -30,6 +30,24 @@ ok()  { log "  ✅ $*"; }
 warn(){ log "  ⚠️  $*"; }
 fail(){ log "  ❌ $*"; exit 1; }
 
+# Try a symlink; fall back to copy if ln -sf fails (Windows Git Bash).
+# Returns 0 either way; sets SYMLINK_OK=1 if real symlink was created.
+make_link() {
+  local src="$1" dst="$2"
+  if ln -sf "$src" "$dst" 2>/dev/null; then
+    # verify it really is a symlink (Windows ln may silently copy)
+    if [[ -L "$dst" ]]; then
+      SYMLINK_OK=1
+      return 0
+    fi
+  fi
+  # fallback: plain copy
+  if command -v cp >/dev/null 2>&1; then
+    cp -f "$src" "$dst" 2>/dev/null && SYMLINK_OK=0 && return 0
+  fi
+  return 1
+}
+
 # ---------- preflight ----------
 command -v git   >/dev/null 2>&1 || fail "git is required but not installed"
 command -v bash >/dev/null 2>&1 || fail "bash is required"
@@ -61,14 +79,32 @@ fi
 [[ -x "$SOURCE_PATH/bin/kb-workflow" ]]  || fail "bin/kb-workflow not executable in $SOURCE_PATH"
 ok "source ready: $SOURCE_PATH"
 
+# v0.3.4: detect platform early and warn about Windows symlink limitations
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*)
+    warn "Windows detected ($(uname -s))"
+    warn "Git Bash on Windows may fall back from 'ln -sf' to file copy."
+    warn "installer will use make_link() with cp fallback + .installed_source file"
+    ;;
+esac
+
 # ---------- 2. create KB root ----------
 mkdir -p "$KB_ROOT/entries" "$KB_ROOT/external"
 ok "KB root: $KB_ROOT"
 
 # ---------- 3. symlink CLI ----------
 mkdir -p "$LOCAL_BIN"
-ln -sf "$SOURCE_PATH/bin/kb-workflow" "$LOCAL_BIN/kb-workflow"
-ok "CLI: $LOCAL_BIN/kb-workflow → $SOURCE_PATH/bin/kb-workflow"
+make_link "$SOURCE_PATH/bin/kb-workflow" "$LOCAL_BIN/kb-workflow"
+if [[ "${SYMLINK_OK:-0}" -eq 1 ]]; then
+  ok "CLI: $LOCAL_BIN/kb-workflow → $SOURCE_PATH/bin/kb-workflow (symlink)"
+else
+  warn "CLI: $LOCAL_BIN/kb-workflow (copy — symlink unavailable, e.g. Windows Git Bash)"
+fi
+
+# v0.3.4 Windows fallback: write .installed_source so bin/kb-workflow can
+# resolve WORKFLOW_HOME even when the CLI was copied instead of symlinked.
+echo "$SOURCE_PATH" > "$LOCAL_BIN/.installed_source"
+ok ".installed_source written: $SOURCE_PATH"
 
 # ensure ~/.local/bin is on PATH for this session
 case ":$PATH:" in
@@ -78,9 +114,11 @@ esac
 
 # ---------- 4. symlink Skill ----------
 mkdir -p "$HOME/.claude/skills" "$SKILL_DIR"
-ln -sf "$SOURCE_PATH/SKILL.md"   "$SKILL_DIR/SKILL.md"
-ln -sf "$SOURCE_PATH/config"     "$SKILL_DIR/config"
-[[ -f "$SOURCE_PATH/CHANGELOG.md" ]] && ln -sf "$SOURCE_PATH/CHANGELOG.md" "$SKILL_DIR/CHANGELOG.md"
+make_link "$SOURCE_PATH/SKILL.md"       "$SKILL_DIR/SKILL.md"
+make_link "$SOURCE_PATH/config"         "$SKILL_DIR/config"
+if [[ -f "$SOURCE_PATH/CHANGELOG.md" ]]; then
+  make_link "$SOURCE_PATH/CHANGELOG.md"  "$SKILL_DIR/CHANGELOG.md"
+fi
 ok "Skill: $SKILL_DIR"
 
 # ---------- 5. config.local.yaml ----------

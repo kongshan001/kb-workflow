@@ -12,13 +12,38 @@ set -euo pipefail
 # ---------- resolve KB_ROOT + workflow home ----------
 KB_ROOT="${KB_ROOT:-$HOME/.claude/kb}"
 SCRIPT_PATH="${BASH_SOURCE[0]}"
-# follow symlink to find real install location
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+
+# Resolve WORKFLOW_HOME via fallback chain (v0.3.4 Windows-aware):
+#   1. POSIX symlink resolution (readlink -f)
+#   2. .installed_source file (Windows fallback when ln -sf → file copy)
+#   3. heuristic: assume script is at <workflow_home>/bin/kb-workflow
+WORKFLOW_HOME=""
 if [[ -L "$SCRIPT_PATH" ]]; then
   REAL_SCRIPT="$(readlink -f "$SCRIPT_PATH" 2>/dev/null || readlink "$SCRIPT_PATH")"
-else
-  REAL_SCRIPT="$SCRIPT_PATH"
+  WORKFLOW_HOME="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd 2>/dev/null || echo "")"
 fi
-WORKFLOW_HOME="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
+if [[ -z "$WORKFLOW_HOME" || ! -f "$WORKFLOW_HOME/SKILL.md" ]]; then
+  # Fallback 2: .installed_source file (written by install.sh for Windows)
+  if [[ -f "$SCRIPT_DIR/.installed_source" ]]; then
+    SRC="$(head -n1 "$SCRIPT_DIR/.installed_source" 2>/dev/null | tr -d '[:space:]')"
+    if [[ -n "$SRC" && -d "$SRC" && -f "$SRC/SKILL.md" ]]; then
+      WORKFLOW_HOME="$SRC"
+    fi
+  fi
+fi
+if [[ -z "$WORKFLOW_HOME" || ! -f "$WORKFLOW_HOME/SKILL.md" ]]; then
+  # Fallback 3: assume script is in <workflow_home>/bin/
+  HEURISTIC="$(cd "$SCRIPT_DIR/.." && pwd 2>/dev/null || echo "")"
+  if [[ -n "$HEURISTIC" && -f "$HEURISTIC/SKILL.md" ]]; then
+    WORKFLOW_HOME="$HEURISTIC"
+  fi
+fi
+if [[ -z "$WORKFLOW_HOME" ]]; then
+  echo "  ❌  cannot resolve WORKFLOW_HOME — set KB_WORKFLOW_HOME env" >&2
+  exit 1
+fi
+export WORKFLOW_HOME
 
 VERSION="0.3.3-dev"
 
