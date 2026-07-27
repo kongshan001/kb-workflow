@@ -26,8 +26,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from frontmatter import parse_string as parse_frontmatter, backend as fm_backend
+from kb_paths import resolve_paths  # SSOT for KB path resolution (v0.4.0)
 
-KB_ROOT = Path(os.environ.get("KB_ROOT", Path.home() / ".claude" / "kb"))
+_PATHS = resolve_paths()
+KB_ROOT = _PATHS["KB_ROOT"]
 ENTRIES_DIR = KB_ROOT / "entries"
 EXTERNAL_DIR = KB_ROOT / "external"
 

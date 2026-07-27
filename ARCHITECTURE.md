@@ -179,7 +179,31 @@ Diagnostic command that prints:
 - Health checks (writable? missing?)
 - Exit code 1 if issues found (CI-friendly)
 
-## 7. Recall Mechanism (v0.3.4)
+## 7. KB Path Resolution (SSOT, v0.4.0)
+
+All Python scripts (recall.py / forget.py / drift_check.py / regen_palace.py) import from `scripts/kb_paths.py` to resolve KB paths. Bash scripts (`bin/kb-workflow` / `install.sh`) maintain their own equivalent in shell — **must stay in sync**.
+
+Resolution chain (canonical):
+```
+1. per-path env override (KB_STATE_FILE / KB_CONFIG_FILE / KB_INDEX_FILE)
+   → derive KB_ROOT from dirname of override
+2. KB_HOME env var (single-root)
+3. KB_ROOT env var
+4. walk-up from cwd looking for .claude/kb/
+5. walk-up from script install dir looking for .claude/kb/
+6. $HOME/.claude/kb/  (POSIX) / $USERPROFILE\.claude\kb (Windows-native)
+```
+
+CLI usage:
+```bash
+python3 scripts/kb_paths.py --validate   # check structure
+python3 scripts/kb_paths.py --json      # machine-readable
+KB_ROOT=/x python3 scripts/kb_paths.py  # override + resolve
+```
+
+When changing the resolution chain, mirror the change in `bin/kb-workflow` lines 19-46 (bash equivalent). The two implementations drift apart easily — that's why user-reported bugs #2 and #4 (KB path inconsistency + empty KB) appeared. SSOT was the missing piece.
+
+## 8. Recall Mechanism (v0.3.4)
 
 ```
 /kb-recall "query" [--topic T] [--format json|text] [--mode text|embed] [--limit N]
@@ -269,6 +293,7 @@ skill repo (v0.3.3+ tagged):
 │   ├── drift_check.py           # Python, ~270 lines, 4-check auditor
 │   ├── forget.py                # Python, ~250 lines, D12 soft-delete
 │   ├── frontmatter.py           # Python, ~130 lines, shared YAML parser
+│   ├── kb_paths.py              # Python, ~200 lines, SSOT path resolver (v0.4.0)
 │   ├── dedup.py                 # Python, ~190 lines, semantic dedup
 │   ├── regen_palace.py          # Python, ~180 lines, KB → palace mirror
 │   └── capability-detect.sh     # bash, ~60 lines
@@ -325,6 +350,7 @@ From independent production-readiness assessment + user feedback:
 | High | `bin/kb-workflow update` doesn't compare semver | Open |
 | High | Python 3.10+ requirement not documented in install preflight | Open |
 | High | D6 sensitive_data escalation is purely advisory | Open |
+| Medium | `bin/kb-workflow` bash walk-up may drift from `kb_paths.py` Python | Open (mirror manually when changing) |
 | Medium | `recall.py` text-mode scoring doesn't filter by `expires_at` or `confidence` | Open |
 | Medium | `dedup.py` is O(N²) pairwise | Open |
 | Medium | No structured logging (`logging` module) | Open |

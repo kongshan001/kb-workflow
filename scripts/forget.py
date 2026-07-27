@@ -24,10 +24,14 @@ import sys
 from datetime import date
 from pathlib import Path
 
-KB_ROOT = Path(os.environ.get("KB_ROOT", Path.home() / ".claude" / "kb"))
+sys.path.insert(0, str(Path(__file__).parent))
+from kb_paths import resolve_paths  # SSOT for KB path resolution (v0.4.0)
+
+_PATHS = resolve_paths()
+KB_ROOT = _PATHS["KB_ROOT"]
 ENTRIES_DIR = KB_ROOT / "entries"
 EXTERNAL_DIR = KB_ROOT / "external"
-INDEX_FILE = EXTERNAL_DIR / "_index.md"
+INDEX_FILE = _PATHS["KB_INDEX_FILE"]
 
 
 def parse_index_row(line: str):
