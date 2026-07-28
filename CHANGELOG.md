@@ -365,6 +365,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   - Tested via `/tmp/win-test` simulation: `cp` + `.installed_source` →
     `kb-workflow status` correctly resolves workflow path.
 
+## [0.2.2] - 2026-07-25
+
+### Added
+- **`'收录'` natural-language trigger + `/kb-recall`** — addresses both
+  original user requirements (capture entry point + explicit recall) in a
+  single release.
+
+> Reconstructed 2026-07-28 from tag `v0.2.2` (commit `895514c`) — this
+> section was missing from CHANGELOG despite the tag existing.
+
 ## [0.2.1] - 2026-07-25
 
 ### Added
@@ -472,7 +482,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - 10-topic starter whitelist
 - Sample tested end-to-end on demo1 project
 
-[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/kongshan001/kb-workflow/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/kongshan001/kb-workflow/compare/v0.2.2...v0.3.3
+[0.2.2]: https://github.com/kongshan001/kb-workflow/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/kongshan001/kb-workflow/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kongshan001/kb-workflow/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kongshan001/kb-workflow/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kongshan001/kb-workflow/compare/v0.1.0...v0.1.1
