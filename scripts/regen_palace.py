@@ -24,15 +24,16 @@ Standalone use (no Claude session): the script falls back to a sidecar
 
 import argparse
 import json
-import os
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from frontmatter import parse_string as parse_frontmatter
+from kb_paths import resolve_paths, ensure_utf8  # SSOT (v0.4.0) — replaces hardcoded KB_ROOT
 
-KB_ROOT = Path(os.environ.get("KB_ROOT", Path.home() / ".claude" / "kb"))
+_PATHS = resolve_paths()
+KB_ROOT = _PATHS["KB_ROOT"]
 EXTERNAL_DIR = KB_ROOT / "external"
 
 
@@ -123,6 +124,7 @@ def cmd_plan(apply: bool):
 
 
 def main():
+    ensure_utf8()
     p = argparse.ArgumentParser(description="Mirror external/ articles to MemPalace")
     p.add_argument("--apply", action="store_true",
                    help="Generate apply manifest (vs default plan manifest)")
@@ -132,7 +134,8 @@ def main():
 
     global KB_ROOT, EXTERNAL_DIR
     if args.kb_root:
-        KB_ROOT = args.kb_root
+        _paths = resolve_paths(kb_root=args.kb_root)
+        KB_ROOT = _paths["KB_ROOT"]
         EXTERNAL_DIR = KB_ROOT / "external"
 
     return cmd_plan(apply=args.apply)

@@ -25,7 +25,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from kb_paths import resolve_paths  # SSOT for KB path resolution (v0.4.0)
+from kb_paths import resolve_paths, ensure_utf8  # SSOT for KB path resolution (v0.4.0)
 
 _PATHS = resolve_paths()
 KB_ROOT = _PATHS["KB_ROOT"]
@@ -54,8 +54,10 @@ def find_entry(slug: str):
         if f.name == "_index.md":
             continue
         # extract slug from filename (handle both `-` and `_` separators)
-        m = re.match(r"^\d{4}-\d{2}-\d{2}[-_][^_-]+[-_](.+)\.md$", f.name)
-        if m and m.group(1) == slug:
+        # v0.4.4: topic may contain '-' (e.g. llm-memory) — greedy first group,
+        # slug is group(2) after the LAST separator.
+        m = re.match(r"^\d{4}-\d{2}-\d{2}[-_](.+)[-_](.+)\.md$", f.name)
+        if m and m.group(2) == slug:
             return f, "external"
         if f.stem == slug:
             return f, "external"
@@ -163,6 +165,7 @@ def sync_index_restore(ingested: str, topic: str, slug: str, source_url: str):
 
 
 def main():
+    ensure_utf8()
     p = argparse.ArgumentParser(description="kb-workflow /kb-forget: soft/hard delete + restore")
     p.add_argument("slug", nargs="?", help="entry slug to forget/restore")
     p.add_argument("--hard", action="store_true", help="irreversible physical rm")

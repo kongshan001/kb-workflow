@@ -12,7 +12,6 @@ Usage:
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -20,8 +19,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from frontmatter import parse_string as _parse_frontmatter
+from kb_paths import resolve_paths, ensure_utf8  # SSOT (v0.4.0) — replaces hardcoded KB_ROOT
 
-KB_ROOT = Path(os.environ.get("KB_ROOT", Path.home() / ".claude" / "kb"))
+_PATHS = resolve_paths()
+KB_ROOT = _PATHS["KB_ROOT"]
 ENTRIES_DIR = KB_ROOT / "entries"
 
 
@@ -87,6 +88,7 @@ def cosine(a: list[float], b: list[float]) -> float:
 
 
 def main():
+    ensure_utf8()
     p = argparse.ArgumentParser()
     p.add_argument("--threshold", type=float, default=0.9,
                    help="Cosine similarity above which to flag as duplicate")

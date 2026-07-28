@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from frontmatter import parse_string as parse_frontmatter, backend as fm_backend
-from kb_paths import resolve_paths  # SSOT for KB path resolution (v0.4.0)
+from kb_paths import resolve_paths, ensure_utf8  # SSOT for KB path resolution (v0.4.0)
 
 _PATHS = resolve_paths()
 KB_ROOT = _PATHS["KB_ROOT"]
@@ -112,10 +112,6 @@ def extract_snippet(body: str, query: str, max_len: int = 400) -> str:
 
 def score_text(content: str, query: str) -> float:
     """Naive keyword-based relevance score."""
-
-
-def score_text(content: str, query: str) -> float:
-    """Naive keyword-based relevance score."""
     body_lower = content.lower()
     q_lower = query.lower()
     terms = [t for t in re.split(r"\s+", q_lower) if len(t) > 1]
@@ -169,7 +165,7 @@ def _build_hit(file_path, meta, body, score, anchor, snippet, query):
     return {
         "file": str(file_path),
         "name": file_path.stem,
-        "type": meta.get("type", "external_article"),
+        "type": metadata.get("type") or meta.get("type") or "external_article",
         "description": meta.get("description", ""),
         "topic": get_topic(meta) or "",
         "source_url": metadata.get("source_url", "") or meta.get("source_url", ""),
@@ -181,6 +177,7 @@ def _build_hit(file_path, meta, body, score, anchor, snippet, query):
 
 
 def main():
+    ensure_utf8()
     p = argparse.ArgumentParser()
     p.add_argument("query", help="search query")
     p.add_argument("--mode", choices=["text", "embed", "hybrid"], default="text")

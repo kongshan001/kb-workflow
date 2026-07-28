@@ -71,6 +71,24 @@ def _user_home() -> Path:
     return Path.home()
 
 
+def ensure_utf8() -> None:
+    """Force stdout/stderr to UTF-8 (v0.4.4 — fix Chinese-Windows GBK crash).
+
+    Windows Chinese locale defaults stdout to GBK (cp936), which cannot encode
+    the emoji used in CLI output (e.g. 🔍 ❌ ⚠️ ✗) and crashes with
+    UnicodeEncodeError mid-print. Safe no-op on POSIX and when ``reconfigure``
+    is unavailable. Every script's ``main()`` should call this before any print.
+    """
+    import sys as _sys
+    for _stream in (_sys.stdout, _sys.stderr):
+        _reconfigure = getattr(_stream, "reconfigure", None)
+        if callable(_reconfigure):
+            try:
+                _reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, TypeError):
+                pass
+
+
 def resolve_paths(
     *,
     kb_root: Optional[Path] = None,
@@ -103,7 +121,10 @@ def resolve_paths(
         "KB_INDEX_FILE": kb_index_file is None and os.environ.get("KB_INDEX_FILE"),
     }
     p = {
-        "KB_ROOT": Path(kb_root) if kb_root else (Path(env["KB_ROOT"]) if env["KB_ROOT"] else None),
+        # KB_ROOT is NOT pre-populated from env here — Rule 2 owns the env
+        # path so it can attribute `source`. (v0.4.4: pre-populating from env
+        # made Rule 2 dead code and left source=None for KB_ROOT env.)
+        "KB_ROOT": Path(kb_root) if kb_root else None,
         "KB_STATE_FILE": Path(kb_state_file) if kb_state_file else (Path(env["KB_STATE_FILE"]) if env["KB_STATE_FILE"] else None),
         "KB_CONFIG_FILE": Path(kb_config_file) if kb_config_file else (Path(env["KB_CONFIG_FILE"]) if env["KB_CONFIG_FILE"] else None),
         "KB_INDEX_FILE": Path(kb_index_file) if kb_index_file else (Path(env["KB_INDEX_FILE"]) if env["KB_INDEX_FILE"] else None),
@@ -131,7 +152,7 @@ def resolve_paths(
         source = "KB_HOME env"
 
     # Rule 2: KB_ROOT env var
-    if p["KB_ROOT"] is None and p["KB_ROOT"] is None and p.get("KB_ROOT") is None and env["KB_ROOT"]:
+    if p["KB_ROOT"] is None and env["KB_ROOT"]:
         p["KB_ROOT"] = Path(env["KB_ROOT"])
         source = "KB_ROOT env"
 
@@ -224,9 +245,11 @@ def main():
         out = resolved
 
     if args.json:
-        # str-only output for JSON
-        print(json.dumps({k: str(v) if isinstance(v, Path) else v
-                          for k, v in out.items()}, ensure_ascii=False, indent=2))
+        # v0.4.4: default=str serializes nested Path objects too. The previous
+        # top-level comprehension only converted Path at depth 1, so the
+        # --validate branch (out = {"paths": ..., "structure": ...}) raised
+        # "WindowsPath is not JSON serializable". default=str catches every Path.
+        print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
     else:
         print("=== kb-workflow resolved paths ===")
         print(f"KB_ROOT:       {resolved['KB_ROOT']}    [{resolved['source']}]")

@@ -22,7 +22,10 @@
 set -euo pipefail
 
 # ---------- helpers ----------
-log() { printf '%b\n' "$*"; }
+# v0.4.4: %s not %b — %b interprets backslash escapes, which corrupts Windows
+# paths like C:\Users\admin (\U → unicode escape attempt). Mirrors the
+# bin/kb-workflow `say()` fix (v0.4.1 issue #1 P1-③); this log() was missed then.
+log() { printf '%s\n' "$*"; }
 ok()  { log "  ✅ $*"; }
 warn(){ log "  ⚠️  $*"; }
 fail(){ log "  ❌ $*"; exit 1; }

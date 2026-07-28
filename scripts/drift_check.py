@@ -24,6 +24,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from kb_paths import ensure_utf8  # v0.4.4: UTF-8 stdout for Chinese-Windows
+
 KB_ROOT = Path(os.environ.get("KB_ROOT", Path.home() / ".claude" / "kb"))
 SKILL_ROOT = Path(os.environ.get(
     "KB_SKILL_ROOT",
@@ -73,8 +76,12 @@ def check_index_drift(kb_root: Path) -> dict:
     for fname in actual_files:
         # strip YYYY-MM-DD[-_]<topic>[-_]<slug>.md prefix
         # v0.3.1: accept both `_` and `-` as separator (existing KB uses both)
-        m = re.match(r"^\d{4}-\d{2}-\d{2}[-_][^_-]+[-_](.+)\.md$", fname)
-        slug = m.group(1) if m else fname.replace(".md", "")
+        # v0.4.4: topic may contain '-' (e.g. llm-memory). Greedy first group
+        # lands the LAST [-_] as the topic/slug split, so slug = group(2).
+        # (was [^_-]+ which truncated llm-memory→llm and mis-parsed the slug,
+        #  falsely reporting drift on every llm-* entry.)
+        m = re.match(r"^\d{4}-\d{2}-\d{2}[-_](.+)[-_](.+)\.md$", fname)
+        slug = m.group(2) if m else fname.replace(".md", "")
         file_slugs.add(slug)
 
     result["diff"] = sorted(file_slugs ^ indexed_slugs)
@@ -220,6 +227,7 @@ def check_changelog(skill_root: Path) -> dict:
 
 
 def main():
+    ensure_utf8()
     parser = argparse.ArgumentParser(description="kb-workflow consistency drift detector")
     parser.add_argument("--kb-root", default=KB_ROOT, help="KB root directory")
     parser.add_argument("--skill-root", default=SKILL_ROOT, help="skill install root")
