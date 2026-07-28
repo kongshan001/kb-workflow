@@ -201,6 +201,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   unavailable (warns to stderr). Use case: keyword density (text-mode)
   misses semantic matches; semantic-only (embed-mode) misses exact
   keyword hits. Hybrid gets both.
+- **`install.sh --local / --global`** (v0.3.4) — explicit install scope:
+  - `--global` (default): install to `~/.claude/skills/`, `~/.local/bin/`, `~/.claude/kb/` (KB travels across projects)
+  - `--local` / `--project`: install to `./.claude/skills/`, `./bin/`, `./.claude/kb/` (project-scoped, can be gitignored)
+  - `--kb-root PATH`: override KB_ROOT (works in either scope)
+  - `--uninstall`: symmetric cleanup (KB kept by default)
+  - Interactive prompt when no flag + TTY: `[G/L, default=G]`
+- **`bin/kb-workflow` KB_ROOT auto-detection** (v0.3.4) — 3-step:
+  1. KB_ROOT env var (always wins)
+  2. walk up from SCRIPT_DIR looking for `.claude/kb/` (project-local)
+  3. fallback to `~/.claude/kb/` (global)
+- **`recall.py` snippet anchoring + citations + JSON output** (v0.3.4) —
+  search results now include:
+  - `section_anchor` — nearest preceding `## heading` (citation context)
+  - `topic` / `source_url` / `last_seen` per hit (full provenance)
+  - snippet window anchored to first query term match (~400 chars)
+  - `--format json` option for machine-readable synthesis by assistant
+  - `--format text` (default) preserves human-friendly emoji output
+- **`KB_HOME` single-root env var** (v0.3.4, XDG-style) — all KB paths
+  derive from `KB_HOME` unless individually overridden (CARGO_HOME / XDG_DATA_HOME
+  / Obsidian vault pattern). Priority chain: per-path env > KB_HOME > walk-up
+  discovery > `$HOME/.claude/kb/`.
+- **`kb-workflow doctor`** command (v0.3.4) — diagnostic helper that prints:
+  - Platform info (uname, $HOME, $USERPROFILE on Windows)
+  - Resolved paths for all KB env vars (with `← env` annotation for overrides)
+  - Health checks (writable? missing? for each path)
+  - Hint when issues found
+- **SKILL.md "平台考量" section** (v0.3.4) — table comparing macOS / Linux /
+  Git Bash on Windows / Windows-native / WSL environments + OneDrive sync
+  pitfall warning + KB_HOME usage example.
 
 ### Fixed
 - **Chinese-Windows GBK stdout crash** (v0.4.4) — `recall.py` /
@@ -237,20 +266,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   `TypeError: WindowsPath is not JSON serializable`. Fix:
   `json.dumps(..., default=str)` catches every nested Path. Now emits full
   JSON, exit 0.
-
-### Tested
-- **v0.4.4 regression (Windows Git Bash, native GBK stdout)**: rebuilt an
-  isolated KB with `entries/fact-pybind11-ffi.md` +
-  `external/2026-07-26_llm-memory_mem0.md` (topic=`llm-memory`).
-  (1) `recall "pybind11 FFI"` → `[fact]` + emoji, no crash;
-  (2) `drift_check` → all 4 checks OK, exit 0 (was FAIL / exit 1);
-  (3) `/kb-forget mem0` → soft-deleted (was "no entry found");
-  (4) `--restore mem0` → round-trip OK;
-  (5) `kb_paths --json --validate` → full JSON, exit 0 (was WindowsPath crash);
-  (6) `install.sh log()` `%b`→`%s` verified via printf side-by-side.
-  Fixture cleaned up after.
-
-### Fixed
 - **install.sh default scope** (v0.4.3) — user reported "default still
   installs to global even when in project dir". Two real issues:
   1. `*.csproj` glob never matched (`-f` doesn't expand globs in bash)
@@ -266,8 +281,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
     * cwd has project markers → local
     * cwd is $HOME → global (clearly cross-project intent)
     * cwd is somewhere else, no markers → local (safer than polluting $HOME)
-
-### Fixed
 - **P1-④ retry: capability-detect network probe** (v0.4.2) — probed
   `https://github.com` (root domain, not a git repo) → `ls-remote`
   always failed with "repository not found" regardless of network state.
@@ -291,65 +304,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
     (was: `<<'EOF'` literal `$()`).
   - **P2-⑥**: `make_link` detects same-source-dest → no-op (covers
     `--local` from repo dir case).
-- **`kb-workflow bootstrap`** command (v0.3.4) — auto-creates missing
-  KB structure: `entries/`, `external/`, `_state.md`,
-  `external/_index.md`, `config.local.yaml`. Idempotent — re-running
-  reports "no changes needed". Fixes missing-bootstrap scenario where
-  user has empty `entries/ + external/` but no state/index/config.
-- **SKILL.md startup step 2 "bootstrap"** (v0.3.4) — explicit procedure
-  for missing-file detection: if any required file is missing, call
-  `kb-workflow bootstrap` before reading state.
-
-### Fixed
-- **SKILL.md startup hardcoded `Read ~/.claude/kb/_state.md`** —
-  startup now explicitly executes walk-up discovery (KB_ROOT env >
-  KB_HOME env > walk-up from cwd > walk-up from SKILL dir > ~/.claude/kb/)
-  before reading state. Fixes Windows-native + project-local install
-  scenarios where `~/.claude/kb/` doesn't exist.
-
-## [Unreleased]
-
-### Added
-- **`recall.py` snippet anchoring + citations + JSON output** (v0.3.4) —
-  search results now include:
-  - `section_anchor` — nearest preceding `## heading` (citation context)
-  - `topic` / `source_url` / `last_seen` per hit (full provenance)
-  - snippet window anchored to first query term match (~400 chars)
-  - `--format json` option for machine-readable synthesis by assistant
-  - `--format text` (default) preserves human-friendly emoji output
-- **`KB_HOME` single-root env var** (v0.3.4, XDG-style) — all KB paths
-  derive from `KB_HOME` unless individually overridden (CARGO_HOME / XDG_DATA_HOME
-  / Obsidian vault pattern). Priority chain: per-path env > KB_HOME > walk-up
-  discovery > `$HOME/.claude/kb/`.
-- **`kb-workflow doctor`** command (v0.3.4) — diagnostic helper that prints:
-  - Platform info (uname, $HOME, $USERPROFILE on Windows)
-  - Resolved paths for all KB env vars (with `← env` annotation for overrides)
-  - Health checks (writable? missing? for each path)
-  - Hint when issues found
-- **SKILL.md "平台考量" section** (v0.3.4) — table comparing macOS / Linux /
-  Git Bash on Windows / Windows-native / WSL environments + OneDrive sync
-  pitfall warning + KB_HOME usage example.
-
-### Tested
-- `kb-workflow doctor` (no env): all 6 paths detected + writable ✓
-- `KB_HOME=/tmp/kb-test kb-workflow doctor`: single-root override works ✓
-
-## [Unreleased]
-
-### Added
-- **`install.sh --local / --global`** (v0.3.4) — explicit install scope:
-  - `--global` (default): install to `~/.claude/skills/`, `~/.local/bin/`, `~/.claude/kb/` (KB travels across projects)
-  - `--local` / `--project`: install to `./.claude/skills/`, `./bin/`, `./.claude/kb/` (project-scoped, can be gitignored)
-  - `--kb-root PATH`: override KB_ROOT (works in either scope)
-  - `--uninstall`: symmetric cleanup (KB kept by default)
-  - Interactive prompt when no flag + TTY: `[G/L, default=G]`
-- **`bin/kb-workflow` KB_ROOT auto-detection** (v0.3.4) — 3-step:
-  1. KB_ROOT env var (always wins)
-  2. walk up from SCRIPT_DIR looking for `.claude/kb/` (project-local)
-  3. fallback to `~/.claude/kb/` (global)
-- Tested: project-local install → `status` correctly resolves to `./.claude/kb/`
-
-### Fixed
 - **Windows symlink fallback** (v0.3.4, D10 evolution from user critique) —
   Git Bash on Windows doesn't always support `ln -sf` (silently falls back
   to file copy), breaking `readlink -f` in `bin/kb-workflow` and causing
@@ -362,8 +316,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
      (contains absolute path to skill root)
   4. `install.sh` — early Windows detection (MINGW/MSYS/CYGWIN)
      prints upfront warning
-  - Tested via `/tmp/win-test` simulation: `cp` + `.installed_source` →
-    `kb-workflow status` correctly resolves workflow path.
+- **`kb-workflow bootstrap`** command (v0.3.4) — auto-creates missing
+  KB structure: `entries/`, `external/`, `_state.md`,
+  `external/_index.md`, `config.local.yaml`. Idempotent — re-running
+  reports "no changes needed". Fixes missing-bootstrap scenario where
+  user has empty `entries/ + external/` but no state/index/config.
+- **SKILL.md startup step 2 "bootstrap"** (v0.3.4) — explicit procedure
+  for missing-file detection: if any required file is missing, call
+  `kb-workflow bootstrap` before reading state.
+- **SKILL.md startup hardcoded `Read ~/.claude/kb/_state.md`** (v0.3.4) —
+  startup now explicitly executes walk-up discovery (KB_ROOT env >
+  KB_HOME env > walk-up from cwd > walk-up from SKILL dir > ~/.claude/kb/)
+  before reading state. Fixes Windows-native + project-local install
+  scenarios where `~/.claude/kb/` doesn't exist.
+
+### Tested
+- **v0.4.4 regression (Windows Git Bash, native GBK stdout)**: rebuilt an
+  isolated KB with `entries/fact-pybind11-ffi.md` +
+  `external/2026-07-26_llm-memory_mem0.md` (topic=`llm-memory`).
+  (1) `recall "pybind11 FFI"` → `[fact]` + emoji, no crash;
+  (2) `drift_check` → all 4 checks OK, exit 0 (was FAIL / exit 1);
+  (3) `/kb-forget mem0` → soft-deleted (was "no entry found");
+  (4) `--restore mem0` → round-trip OK;
+  (5) `kb_paths --json --validate` → full JSON, exit 0 (was WindowsPath crash);
+  (6) `install.sh log()` `%b`→`%s` verified via printf side-by-side.
+  Fixture cleaned up after.
+- **v0.3.4 install / doctor / Windows symlink**:
+  - `kb-workflow doctor` (no env): all 6 paths detected + writable ✓
+  - `KB_HOME=/tmp/kb-test kb-workflow doctor`: single-root override works ✓
+  - project-local install → `status` correctly resolves to `./.claude/kb/`
+  - Windows symlink: `/tmp/win-test` simulation (`cp` + `.installed_source`)
+    → `kb-workflow status` correctly resolves workflow path.
 
 ## [0.2.2] - 2026-07-25
 
