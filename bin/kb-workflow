@@ -83,7 +83,7 @@ if [[ -z "$WORKFLOW_HOME" ]]; then
 fi
 export WORKFLOW_HOME
 
-VERSION="0.3.3-dev"
+VERSION="0.4.4-dev"
 
 # ---------- colors ----------
 if [[ -t 1 ]]; then

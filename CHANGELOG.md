@@ -203,6 +203,54 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
   keyword hits. Hybrid gets both.
 
 ### Fixed
+- **Chinese-Windows GBK stdout crash** (v0.4.4) — `recall.py` /
+  `drift_check.py` / `forget.py` / `regen_palace.py` / `dedup.py` all
+  crashed with `UnicodeEncodeError: 'gbk' codec can't encode character`
+  on Chinese-Windows locale (stdout defaults to cp936; cannot encode the
+  emoji 🔍 ❌ ⚠️ ✗ used in CLI output). Fix: new `kb_paths.ensure_utf8()`
+  helper forces stdout/stderr to UTF-8; every script's `main()` calls it
+  before any print. Safe no-op on POSIX. Verified with native
+  `sys.stdout.encoding == 'gbk'` (no PYTHONIOENCODING cheat).
+- **drift_check false-positive on `llm-*` topics** (v0.4.4) — slug-extraction
+  regex `[^_-]+` truncated topics containing `-` (e.g. `llm-memory` → `llm`),
+  mis-parsing `2026-07-26_llm-memory_mem0.md` slug as `memory_mem0` and
+  falsely reporting drift vs the `_index.md` row (`mem0`). Fix: greedy first
+  group lands the LAST `[-_]` as the topic/slug split, slug = group(2).
+  Now `[OK] external/_index.md drift`, exit 0.
+- **`/kb-forget` could not find external entries with `-`-topics** (v0.4.4) —
+  same regex in `forget.py:find_entry`. `/kb-forget mem0` returned
+  "no entry found" for any `llm-*` / hyphen-topic entry. Fixed alongside.
+- **recall.py mis-typed entries/ hits as `external_article`** (v0.4.4) —
+  `_build_hit` read top-level `type`, but for entries/ it lives under the
+  nested `metadata:` block, so every fact/preference/decision displayed as
+  `[external_article]`. Fix: read `metadata.type` first (same pattern as
+  `source_url`). Now shows `[fact]` etc.
+- **install.sh `log()` still used `%b`** (v0.4.4) — the v0.4.1 fix that
+  changed `bin/kb-workflow`'s `say()` from `%b` to `%s` (because `%b`
+  interprets backslash escapes and corrupts Windows paths like
+  `C:\Users\admin`) missed `install.sh`'s `log()`. Now mirrored to `%s`.
+  Proven: `printf '%b' 'C:\Users\admin\new_dir'` → `C:\Usersdmin` +
+  newline `ew_dir` (corrupted); `%s` → literal.
+- **`kb_paths.py --json --validate` crashed on WindowsPath** (v0.4.4) —
+  the JSON branch's top-level comprehension only converted Path at depth 1,
+  so the `--validate` payload (`{"paths": ..., "structure": ...}`) raised
+  `TypeError: WindowsPath is not JSON serializable`. Fix:
+  `json.dumps(..., default=str)` catches every nested Path. Now emits full
+  JSON, exit 0.
+
+### Tested
+- **v0.4.4 regression (Windows Git Bash, native GBK stdout)**: rebuilt an
+  isolated KB with `entries/fact-pybind11-ffi.md` +
+  `external/2026-07-26_llm-memory_mem0.md` (topic=`llm-memory`).
+  (1) `recall "pybind11 FFI"` → `[fact]` + emoji, no crash;
+  (2) `drift_check` → all 4 checks OK, exit 0 (was FAIL / exit 1);
+  (3) `/kb-forget mem0` → soft-deleted (was "no entry found");
+  (4) `--restore mem0` → round-trip OK;
+  (5) `kb_paths --json --validate` → full JSON, exit 0 (was WindowsPath crash);
+  (6) `install.sh log()` `%b`→`%s` verified via printf side-by-side.
+  Fixture cleaned up after.
+
+### Fixed
 - **install.sh default scope** (v0.4.3) — user reported "default still
   installs to global even when in project dir". Two real issues:
   1. `*.csproj` glob never matched (`-f` doesn't expand globs in bash)
